@@ -1,0 +1,14 @@
+{
+    "id": "dev/language-advanced",
+    "name": "Language Advanced",
+    "namespace": "Dev\\LanguageAdvanced\\",
+    "provider": "Dev\\LanguageAdvanced\\Providers\\LanguageAdvancedServiceProvider",
+    "author": "Laravel Technologies",
+    "url": "mailto:toan@visualweber.com",
+    "version": "1.2.7",
+    "description": "Advanced Multi-language",
+    "minimum_core_version": "7.3.0",
+    "require": [
+        "dev/language"
+    ]
+}

@@ -1,0 +1,48 @@
+{
+	"authHost": "https://pull-server.server",
+	"authEndpoint": "/broadcasting/auth",
+	"database": "redis",
+	"clients": [
+		{
+			"appId": "77da86b71d1fdf67",
+			"key": "f6bedac4a2626fe0880276aea3cafa63"
+		}
+	],
+	"databaseConfig": {
+		"redis": {
+			"port": "1505",
+			"host": "192.168.10.161",
+			"password": "bnVb5EoOMIAkmp1rFwrCuXXb6LLTfcFElKf3OSLuJLbQUN0cwPTyW9Wrgrac5kdBiSWjl1Osfg"
+		},
+		"sqlite": {
+			"databasePath": "/database/laravel-echo-server.sqlite"
+		}
+	},
+	"devMode": true,
+	"port": "7000",
+	"secureOptions": 67108864,
+	"sslCertPath": "",
+	"sslKeyPath": "",
+	"sslCertChainPath": "",
+	"sslPassphrase": "",
+	"subscribers": {
+		"http": true,
+		"redis": true
+	},
+	"host": "localhost",
+	"protocol": "http",
+	"socketio": {
+		"transports": [
+			"websocket",
+			"polling"
+		]
+	},
+	"apiOriginAllow": {
+		"allowCors": true,
+		"allowOrigin": "*",
+		"allowMethods": "GET,POST,PUT,DELETE,UPDATE,PATCH",
+		"allowHeaders": "Origin, Content-Type, X-Auth-Token, X-Requested-With, Accept, Authorization, X-CSRF-TOKEN, X-Socket-Id"
+	},
+	"verifyAuthPath": true,
+	"verifyAuthServer": false
+}

@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
+
+return new class() extends Migration {
+    public function up(): void
+    {
+        if (Schema::hasTable('personal_access_tokens') && ! Schema::hasColumn('personal_access_tokens', 'expires_at')) {
+            Schema::table('personal_access_tokens', function (Blueprint $table) {
+                $table->timestamp('expires_at')->nullable();
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        if (Schema::hasColumn('personal_access_tokens', 'expires_at')) {
+            Schema::table('personal_access_tokens', function (Blueprint $table) {
+                $table->dropColumn('expires_at');
+            });
+        }
+    }
+
+    public function listTableForeignKeys($table)
+    {
+        return array_map(function ($key) {
+            return $key['name'];
+        }, Schema::getForeignKeys($table));
+    }
+
+    public function listTableIndexes($table)
+    {
+        return array_map(function ($key) {
+            return $key['name'];
+        }, Schema::getIndexes($table));
+    }
+};

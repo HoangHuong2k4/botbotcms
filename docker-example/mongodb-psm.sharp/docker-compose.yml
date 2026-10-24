@@ -1,0 +1,45 @@
+version: '3.7'
+
+services:
+    mongodb:
+      image: mongo:3.2
+      container_name: sharp-mongodb
+      restart: always
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: root
+        MONGO_INITDB_ROOT_PASSWORD: JjV$Mh7dnCvGz98fU
+        MONGO_INITDB_DATABASE: admin
+      ports:
+        - 0.0.0.0:1508:27017
+      volumes:
+        - "./config/mongod.conf:/data/configdb/mongod.conf:ro"
+        - "./data:/data/db"
+        - "./db_dump:/data/db_dump" # mount backup data into docker for restore
+        - "./log:/var/log/mongodb"
+        - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      command: ["/usr/bin/mongod", "-f", "/data/configdb/mongod.conf"] # --auth
+      ulimits:
+        memlock:
+          soft: -1
+          hard: -1      
+      networks:
+        - sharp-network
+    # mongo-express:
+    #   image: mongo-express
+    #   container_name: sharp-mongodb-express
+    #   restart: always
+    #   ports:
+    #     - 8081:8081
+    #   environment:
+    #     ME_CONFIG_MONGODB_ADMINUSERNAME: root
+    #     ME_CONFIG_MONGODB_ADMINPASSWORD: vluKl94NMzDk1HR
+    #     ME_CONFIG_MONGODB_URL: mongodb://root:vluKl94NMzDk1HR@dev-mongodb:27017/
+    #     ME_CONFIG_BASICAUTH: false
+    #   networks:
+    #     - sharp-network
+
+volumes:
+  log: null
+networks:
+  sharp-network:
+    driver: bridge

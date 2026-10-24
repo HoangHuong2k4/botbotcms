@@ -1,0 +1,53 @@
+version: '3.8'
+
+######### Services ###################################
+
+services:
+  # Server container
+  nginx:
+    container_name: thacotaibus-nginx
+    build:
+      context: docker/nginx
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/var/www/api
+      - ./docker/nginx/logs:/var/log/nginx
+    ports:
+      - ${DOCKER_PUBLIC_PORT:-8006}:80
+    links:
+      - client
+      - php
+    depends_on:
+      - client
+      - php
+    restart: unless-stopped
+    networks:
+      - thacotaibus-network
+
+  # PHP FastCGI Process Manager container
+  php:
+    container_name: thacotaibus-php
+    build:
+      context: docker/php
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/var/www/api
+    restart: unless-stopped
+    networks:
+      - thacotaibus-network
+
+  # Client container
+  client: 
+    container_name: thacotaibus-client
+    build:
+      context: .
+      dockerfile: docker/client/Dockerfile
+    restart: unless-stopped
+    networks:
+      - thacotaibus-network
+
+# Networks
+networks:
+  thacotaibus-network:
+    driver: bridge
+    external: false

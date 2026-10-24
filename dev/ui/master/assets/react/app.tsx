@@ -1,0 +1,1 @@
+import React from 'react';\nimport { createRoot } from 'react-dom/client';\n\nconst container = document.getElementById('app');\nif (container) {\n    const root = createRoot(container);\n    root.render(<div>App initialized</div>);\n}

@@ -1,0 +1,50 @@
+{
+  "name": "dev-extensions/kernel",
+  "description": "dev-extensions kernel",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Dev\\Kernel\\": "src/"
+    }
+  },
+  "require": {
+    "laravel/framework": "^9.0|^10.0|^11.0|^12.0",
+    "javoscript/laravel-macroable-models": "*",
+    "google/apiclient": "^2.18"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Dev\\Kernel\\Providers\\KernelServiceProvider"
+      ]
+    },
+    "google/apiclient-services": [
+      "Analytics",
+      "Sheets",
+      "Drive",
+      "DriveActivity"
+    ]
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "@php artisan git:install-commit-hook"
+    ],
+    "post-update-cmd": [
+      "@php artisan git:install-commit-hook",
+      "Google\\Task\\Composer::cleanup"
+    ]
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "preferred-install": "dist",
+    "sort-packages": true,
+    "allow-plugins": {
+      "composer/package-versions-deprecated": true,
+      "pestphp/pest-plugin": true,
+      "wikimedia/composer-merge-plugin": true
+    }
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}

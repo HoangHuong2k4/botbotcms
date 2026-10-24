@@ -1,0 +1,35 @@
+{
+    "apps": [
+        {
+            "name": "pull-echo-server",
+            "script": "laravel-echo-server",
+            "args": "start",
+            "exec_mode": "fork",
+            "interpreter": "node",
+            "watch": "true",
+            "error_file": "./storage/logs/pm2/echo-server.error.log",
+            "out_file": "./storage/logs/pm2/echo-server.out.log",
+            "pid_file": "./storage/logs/pm2/echo-server.pid.log"
+        },
+        {
+            "name": "pull-queue-worker",
+            "script": "artisan",
+            "exec_mode": "fork",
+            "interpreter": "/usr/local/php82/bin/php",
+            "instances": 1,
+            "max_memory_restart": "1G",
+            "watch": "true",
+            "args": [
+                "queue:work",
+                "--tries=5",
+                "--sleep=1",
+                "--timeout=120",
+                "--daemon"
+            ],
+            "error_file": "./storage/logs/pm2/queue-worker.error.log",
+            "out_file": "./storage/logs/pm2/queue-worker.out.log",
+            "pid_file": "./storage/logs/pm2/queue-worker.pid.log",
+            "log_file": "./storage/logs/pm2/log/combined.log"
+        }
+    ]
+}

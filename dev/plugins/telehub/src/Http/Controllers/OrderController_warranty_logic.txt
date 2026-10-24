@@ -1,0 +1,83 @@
+    public function handleWarranty(Request $request, $id)
+    {
+        $order = Order::with('details.product')->findOrFail($id);
+        
+        $user = Auth::user();
+        $isAdmin = $user->isSuperUser();
+        if (!$isAdmin) {
+            if ($tenant = Tenant::current()) {
+                if ($order->tenant_id != $tenant->id) {
+                    abort(403);
+                }
+            }
+        }
+
+        $request->validate([
+            'product_item_id' => 'required|exists:telehub_product_items,id',
+            'type' => 'required|in:refund,replace',
+            'refund_amount' => 'required|numeric|min:0',
+            'days_used' => 'required|integer|min:0',
+            'note' => 'nullable|string'
+        ]);
+
+        $item = \Dev\Telehub\Models\ProductItem::where('id', $request->product_item_id)
+            ->where('order_id', $order->id)
+            ->firstOrFail();
+
+        if ($item->status !== 'active') {
+            return response()->json(['error' => true, 'message' => 'Tài khoản này đã được xử lý bảo hành trước đó.']);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Update item status
+            $item->status = $request->type === 'refund' ? 'revoked' : 'replaced';
+            $item->save();
+
+            // Insert into warranties
+            $warranty = new \Dev\Telehub\Models\Warranty([
+                'tenant_id' => $order->tenant_id,
+                'customer_id' => $order->customer_id,
+                'order_id' => $order->id,
+                'product_item_id' => $item->id,
+                'type' => $request->type,
+                'days_used' => $request->days_used,
+                'refund_amount' => $request->refund_amount,
+                'status' => 'completed',
+                'note' => $request->note
+            ]);
+            $warranty->save();
+
+            // If refund, add balance and log
+            if ($request->type === 'refund' && $request->refund_amount > 0) {
+                $customer = \Dev\Telehub\Models\BotCustomer::find($order->customer_id);
+                if ($customer) {
+                    $customer->balance += $request->refund_amount;
+                    $customer->save();
+
+                    \Dev\Telehub\Models\BalanceLog::create([
+                        'tenant_id' => $order->tenant_id,
+                        'customer_id' => $customer->id,
+                        'order_id' => $order->id,
+                        'type' => 'IN',
+                        'amount' => $request->refund_amount,
+                        'note' => 'Hoàn tiền bảo hành đơn ' . ($order->code ?: $order->id) . ' - ' . ($request->note ?: 'Lỗi tài khoản')
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            // TODO: Call Telegram bot API to notify user (can be handled via Guzzle or queue)
+
+            return response()->json([
+                'error' => false,
+                'message' => 'Xử lý bảo hành thành công!'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => true, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()]);
+        }
+    }
+}

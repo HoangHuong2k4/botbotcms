@@ -1,0 +1,5 @@
+{!! Theme::footer() !!}
+
+</body>
+
+</html>

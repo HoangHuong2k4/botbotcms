@@ -1,0 +1,23 @@
+{
+    "name": "dev-extensions/bootstrap",
+    "description": "Toàn bộ các package cần thiết cho Laravel CMS được nạp từ đây, không/hạn chế điều chỉnh composer.json ngoài thư mục ROOT của dự án",
+    "autoload": {
+        "psr-4": {
+            "Dev\\Bootstrap\\": "src/"
+        }
+    },
+    "require": {
+        "dev-extensions/kernel": "*@dev"
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@create-bin-shortcuts"
+        ],
+        "post-update-cmd": [
+            "@create-bin-shortcuts"
+        ],
+        "create-bin-shortcuts": [
+            "@php -r \"$root = getcwd(); $binDir = $root . '/bin'; $vendorBinDir = $root . '/vendor/bin'; if (is_dir($binDir) && is_dir($vendorBinDir)) { $files = glob($binDir . '/*'); foreach ($files as $file) { if (is_file($file) && is_executable($file)) { $name = basename($file); $target = $vendorBinDir . '/' . $name; if (file_exists($target) && !is_link($target)) { unlink($target); } if (!file_exists($target)) { $relativePath = '../../bin/' . $name; symlink($relativePath, $target); echo 'Created shortcut: vendor/bin/' . $name . PHP_EOL; } } } }\""
+        ]
+    }
+}

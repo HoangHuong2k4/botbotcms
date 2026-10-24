@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tài Liệu API Cộng Tác Viên | Hương MMO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.4);
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: rgba(255, 255, 255, 0.1);
+            --border-highlight: rgba(139, 92, 246, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(56, 189, 248, 0.08), transparent 25%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #c4b5fd, #8b5cf6, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+            display: inline-block;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .badge:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+            transform: translateY(-2px);
+        }
+
+        .badge i {
+            color: var(--primary);
+        }
+
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInUp 0.8s ease both;
+        }
+
+        .section:nth-child(2) { animation-delay: 0.1s; }
+        .section:nth-child(3) { animation-delay: 0.2s; }
+        .section:nth-child(4) { animation-delay: 0.3s; }
+        .section:nth-child(5) { animation-delay: 0.4s; }
+
+        .section:hover {
+            border-color: var(--border-highlight);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 15px rgba(139, 92, 246, 0.1);
+        }
+
+        .section h2 {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .section h2 i {
+            color: var(--primary);
+        }
+
+        .method {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-right: 10px;
+        }
+
+        .method.get { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .method.post { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.3); }
+
+        .endpoint {
+            font-family: monospace;
+            color: #c4b5fd;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+
+        p {
+            margin-bottom: 15px;
+            color: var(--text-muted);
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+            color: var(--text-muted);
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .code-block {
+            background: #0b1120;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .code-block::before {
+            content: attr(data-lang);
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-bottom-left-radius: 8px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        td {
+            color: var(--text-muted);
+        }
+
+        .highlight {
+            color: #fca5a5;
+        }
+
+        .success-text { color: var(--success); }
+        .danger-text { color: var(--danger); }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-card-hover);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        @media (max-width: 600px) {
+            .section { padding: 20px; }
+            h1 { font-size: 2rem; }
+            .endpoint { font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>🤝 TÀI LIỆU API CHO CỘNG TÁC VIÊN</h1>
+            <div class="subtitle">API kết nối đấu bot — mua hàng tự động từ kho hệ thống</div>
+            
+            <div class="contact-info">
+                <div class="badge">
+                    <i class="fa-solid fa-user-shield"></i>
+                    Admin: Phạm Hoàng Hương
+                </div>
+                <div class="badge">
+                    <i class="fa-solid fa-phone"></i>
+                    SĐT: 0932.507.102
+                </div>
+                <a href="https://t.me/ZeroBit2k4" target="_blank" style="text-decoration: none; color: inherit;">
+                    <div class="badge" style="cursor: pointer;">
+                        <i class="fa-brands fa-telegram"></i>
+                        Tele: @ZeroBit2k4
+                    </div>
+                </a>
+            </div>
+        </header>
+
+        <div class="section">
+            <h2><i class="fa-solid fa-rocket"></i> Bắt đầu sử dụng</h2>
+            <p>Hệ thống cung cấp API cho phép bạn tự động hóa việc xem kho, kiểm tra số dư và tự động xuất tài khoản để bán trên bot của riêng bạn. Bạn mua với giá sỉ (tùy chiết khấu) và tự định giá bán lẻ.</p>
+            <ol>
+                <li>Liên hệ Admin <strong>Phạm Hoàng Hương</strong> để đăng ký làm Cộng Tác Viên (CTV).</li>
+                <li>Sau khi được duyệt, bạn sẽ được cấp một <strong>API Key</strong> (dạng <code>DLR_XXXXX...</code>).</li>
+                <li>Nạp tiền vào tài khoản của bạn trên hệ thống.</li>
+                <li>Gắn API Key vào header của mọi request gửi lên server theo hướng dẫn bên dưới.</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h2><i class="fa-solid fa-key"></i> Xác thực (Authentication)</h2>
+            <p>Mọi request <strong>BẮT BUỘC</strong> phải gửi kèm API Key trong header:</p>
+            <div class="code-block" data-lang="http">X-API-KEY: DLR_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX</div>
+            <p class="danger-text"><i class="fa-solid fa-circle-exclamation"></i> Nếu thiếu header hoặc key sai, hệ thống sẽ trả về lỗi HTTP 401 hoặc HTTP 403.</p>
+        </div>
+
+        <div class="section">
+            <h2>
+                <span class="method get">GET</span> 
+                <span class="endpoint">/api/v1/dealer/stock</span>
+            </h2>
+            <p>Xem tồn kho, danh sách sản phẩm và giá sỉ hiện tại của bạn. Bạn nên gọi API này để làm menu trên bot.</p>
+            
+            <div class="code-block" data-lang="curl">
+curl -H "X-API-KEY: DLR_xxxxx" https://domain.com/api/v1/dealer/stock
+            </div>
+            
+            <p><strong>Response 200:</strong></p>
+            <div class="code-block" data-lang="json">
+{
+  "success": true,
+  "dealer": "Tên CTV",
+  "balance": 500000,
+  "products": {
+    "1": {
+      "name": "Tài khoản loại A",
+      "price": 35000,
+      "stock": 50,
+      "type": "account"
+    }
+  }
+}
+            </div>
+            <p><em>💡 Tip: Nên Cache kết quả của API này từ 30-60 giây trên server của bạn, không nên gọi liên tục mỗi khi có khách xem menu.</em></p>
+        </div>
+
+        <div class="section">
+            <h2>
+                <span class="method get">GET</span> 
+                <span class="endpoint">/api/v1/dealer/balance</span>
+            </h2>
+            <p>Kiểm tra số dư hiện tại trong ví của CTV.</p>
+            <div class="code-block" data-lang="curl">
+curl -H "X-API-KEY: DLR_xxxxx" https://domain.com/api/v1/dealer/balance
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>
+                <span class="method post">POST</span> 
+                <span class="endpoint">/api/v1/dealer/buy</span>
+            </h2>
+            <p>Mua hàng tự động. Hệ thống sẽ tự trừ tiền trong ví và trả về thông tin tài khoản.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tham số (JSON)</th>
+                        <th>Bắt buộc</th>
+                        <th>Mô tả</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>product_key</code></td>
+                        <td>Có</td>
+                        <td>ID của sản phẩm (lấy từ API Stock)</td>
+                    </tr>
+                    <tr>
+                        <td><code>qty</code></td>
+                        <td>Có</td>
+                        <td>Số lượng mua (1-100)</td>
+                    </tr>
+                    <tr>
+                        <td><code>order_code</code></td>
+                        <td>Không</td>
+                        <td>Mã đơn hàng tùy chỉnh của bạn (để dễ đối soát)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="code-block" data-lang="curl">
+curl -X POST https://domain.com/api/v1/dealer/buy \
+  -H "X-API-KEY: DLR_xxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{"product_key": "1", "qty": 1, "order_code": "BOT-12345"}'
+            </div>
+
+            <p><strong>Response Thành Công:</strong></p>
+            <div class="code-block" data-lang="json">
+{
+  "success": true,
+  "product": "1",
+  "items": [
+    "user1@gmail.com|pass1",
+    "user2@gmail.com|pass2"
+  ],
+  "qty": 2,
+  "total_charged": 70000,
+  "balance_remaining": 430000,
+  "order_code": "BOT-12345"
+}
+            </div>
+        </div>
+
+        <div class="section">
+            <h2><i class="fa-solid fa-triangle-exclamation"></i> Bảng Mã Lỗi</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã HTTP</th>
+                        <th>Lỗi</th>
+                        <th>Mô tả / Hướng xử lý</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="danger-text">401</td>
+                        <td>Thiếu header X-API-KEY</td>
+                        <td>Cần truyền header xác thực</td>
+                    </tr>
+                    <tr>
+                        <td class="danger-text">403</td>
+                        <td>API key không hợp lệ</td>
+                        <td>Key sai, bị khóa hoặc bạn không có quyền CTV</td>
+                    </tr>
+                    <tr>
+                        <td class="danger-text">400</td>
+                        <td>Lỗi tham số</td>
+                        <td>Thiếu product_key hoặc qty không đúng định dạng</td>
+                    </tr>
+                    <tr>
+                        <td class="success-text">200</td>
+                        <td>Không đủ số dư</td>
+                        <td>Trả về <code>{"success": false, "error": "Cạn số dư"}</code>. Nạp thêm tiền.</td>
+                    </tr>
+                    <tr>
+                        <td class="success-text">200</td>
+                        <td>Hết hàng</td>
+                        <td>Trả về <code>{"success": false, "error": "Hết hàng"}</code>.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</body>
+</html>

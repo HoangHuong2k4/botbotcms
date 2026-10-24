@@ -1,0 +1,54 @@
+{
+	"name": "onesignal-notification-channels/onesignal",
+	"description": "Onesignal Notifications Driver",
+	"keywords": [
+		"onesignal notification",
+		"laravel",
+		"onesignal",
+		"notification",
+		"onesignal notifications channel"
+	],
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "Syed Irfaq R.",
+			"email": "syed@lukonet.com",
+			"homepage": "https://lukonet.com",
+			"role": "Developer"
+		}
+	],
+	"require": {
+		"php": ">=5.6.4",
+		"guzzlehttp/guzzle": "^6.2",
+		"illuminate/notifications": ">=5.3",
+		"illuminate/support": ">=5.1"
+	},
+	"require-dev": {
+		"mockery/mockery": "^0.9.5",
+		"phpunit/phpunit": "5.*",
+		"orchestra/testbench": "3.4.x-dev"
+	},
+	"autoload": {
+		"psr-4": {
+			"NotificationChannels\\Onesignal\\": "src"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"NotificationChannels\\Onesignal\\Test\\": "tests"
+		}
+	},
+	"scripts": {
+		"test": "vendor/bin/phpunit"
+	},
+	"config": {
+		"sort-packages": true
+	},
+	"extra": {
+		"laravel": {
+			"providers": [
+				"NotificationChannels\\Onesignal\\OnesignalServiceProvider"
+			]
+		}
+	}
+}

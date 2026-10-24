@@ -1,0 +1,16 @@
+{
+    "id": "dev/master",
+    "name": "Master",
+    "namespace": "Theme\\Master\\",
+    "description": "Master is default theme for Laravel CMS since v2.0",
+    "author": "Laravel Technologies",
+    "version": "2.0.1",
+    "url": "https://cms.fsofts.com",
+    "required_plugins": [
+        "blog",
+        "contact",
+        "gallery",
+        "language",
+        "member"
+    ]
+}

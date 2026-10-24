@@ -1,0 +1,45 @@
+{
+	"name": "dev-extensions/onesignal-channel",
+	"description": "Onesignal Notification Channel for laravel.",
+	"keywords": [
+		"laravel",
+		"notifications",
+		"onesignal"
+	],
+	"license": "MIT",
+	"version": "1.0.10",
+	"type": "package",
+	"authors": [
+		{
+			"name": "Eugene Lee",
+			"email": "toan.lehuy@hotmail.com"
+		}
+	],
+	"require": {
+		"guzzlehttp/guzzle": "*",
+		"illuminate/notifications": "*",
+		"symfony/psr-http-message-bridge": "*"
+	},
+	"require-dev": {
+		"mockery/mockery": "*",
+		"phpunit/phpunit": "*",
+		"orchestra/testbench": "*"
+	},
+	"autoload": {
+		"psr-4": {
+			"Dev\\OneSignalChannel\\": "src/"
+		}
+	},
+	"config": {
+		"sort-packages": true
+	},
+	"extra": {
+		"laravel": {
+			"providers": [
+				"Dev\\OneSignalChannel\\OneSignalChannelServiceProvider"
+			]
+		}
+	},
+	"minimum-stability": "dev",
+	"prefer-stable": true
+}

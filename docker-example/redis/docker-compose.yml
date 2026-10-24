@@ -1,0 +1,19 @@
+services:
+  # Client container
+  redis:
+    image: redis
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./conf/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./data:/data
+      - ./backup:/backup
+    #ports:
+      #- 6379:6379
+    container_name: 'dev-redis'
+
+# Networks
+networks:
+  pull-network:
+    driver: bridge
+    external: false

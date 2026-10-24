@@ -1,0 +1,32 @@
+node_modules/
+**/node_modules/
+vendor/
+**/vendor/
+/api-tele/
+/TeleBroadcast-Hub/
+/TeleBroadcast-Hub.zip
+.env
+.env.*
+*.log
+.DS_Store
+Thumbs.db
+
+# Storage
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+
+# Temporary / backups
+*.sql
+*.zip
+*.tar.gz
+server/data/
+server/uploads/*
+!server/uploads/.gitkeep
+client/dist/

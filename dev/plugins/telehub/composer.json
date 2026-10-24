@@ -1,0 +1,10 @@
+{
+    "name": "dev/telehub",
+    "description": "Telehub plugin",
+    "type": "botble-plugin",
+    "autoload": {
+        "psr-4": {
+            "Dev\\Telehub\\": "src/"
+        }
+    }
+}

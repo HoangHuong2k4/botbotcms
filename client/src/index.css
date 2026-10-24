@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans antialiased;
+  }
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-gray-900 border border-gray-800 rounded-xl p-5;
+  }
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2;
+  }
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-gray-100 font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2;
+  }
+  .btn-success {
+    @apply bg-green-600 hover:bg-green-500 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2;
+  }
+  .input {
+    @apply bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-300 mb-1;
+  }
+  .badge-success {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-400 border border-green-800;
+  }
+  .badge-danger {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-400 border border-red-800;
+  }
+  .badge-warning {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/50 text-yellow-400 border border-yellow-800;
+  }
+  .badge-info {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/50 text-blue-400 border border-blue-800;
+  }
+}
+
+/* ── Telegram message preview styles ─────────────────────────────── */
+.telegram-preview b,
+.telegram-preview strong { font-weight: 700; color: #f1f5f9; }
+
+.telegram-preview i,
+.telegram-preview em { font-style: italic; }
+
+.telegram-preview u { text-decoration: underline; }
+
+.telegram-preview s { text-decoration: line-through; opacity: 0.75; }
+
+.telegram-preview code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.85em;
+}
+
+.telegram-preview blockquote {
+  border-left: 3px solid #3b82f6;
+  padding-left: 10px;
+  margin: 4px 0;
+  color: #94a3b8;
+}
+
+/* Spoiler: blurred until hover */
+.telegram-preview .tg-spoiler {
+  background: rgba(148,163,184,0.15);
+  border-radius: 3px;
+  padding: 1px 3px;
+  filter: blur(4px);
+  cursor: pointer;
+  transition: filter 0.2s;
+  user-select: none;
+}
+.telegram-preview .tg-spoiler:hover {
+  filter: blur(0);
+}
+
+/* Custom emoji preview badge */
+.telegram-preview .tg-emoji-preview {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(168,85,247,0.15);
+  border: 1px solid rgba(168,85,247,0.35);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 1.1em;
+  cursor: help;
+  vertical-align: middle;
+}
+

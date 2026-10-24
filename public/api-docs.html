@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telehub - Tài Liệu Tích Hợp API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .endpoint { background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem; overflow: hidden; }
+        .endpoint-header { padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 1rem; }
+        .method { padding: 0.25rem 0.75rem; border-radius: 4px; font-weight: 600; font-size: 0.875rem; color: #fff; }
+        .method.get { background-color: #3b82f6; }
+        .method.post { background-color: #10b981; }
+        .url { font-family: monospace; font-size: 1rem; color: #334155; font-weight: 500; }
+        .endpoint-body { padding: 1.5rem; }
+        h1, h2, h3 { color: #0f172a; font-weight: 600; }
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 1rem; margin-bottom: 1.5rem; }
+        .param-table th { text-align: left; padding: 0.75rem; background: #f1f5f9; border-bottom: 2px solid #e2e8f0; font-size: 0.875rem; color: #475569; }
+        .param-table td { padding: 0.75rem; border-bottom: 1px solid #e2e8f0; font-size: 0.875rem; color: #334155; }
+        .param-name { font-family: monospace; font-weight: 600; color: #2563eb; }
+        pre[class*="language-"] { margin-top: 0; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="max-w-5xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
+    <div class="mb-10 text-center">
+        <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight sm:text-5xl">Telehub API Documentation</h1>
+        <p class="mt-4 text-lg text-slate-500">Tài liệu hướng dẫn kết nối API dành cho Cộng Tác Viên (Đại lý)</p>
+    </div>
+
+    <!-- Xác thực -->
+    <div class="bg-white rounded-xl shadow-sm p-8 mb-10 border border-slate-200">
+        <h2 class="text-2xl font-bold mb-4">1. Hướng dẫn Xác thực (Authentication)</h2>
+        <p class="text-slate-600 mb-4">
+            Tất cả các API Endpoints đều yêu cầu phải xác thực bằng cách gửi kèm <strong>API Key</strong> vào Header của Request với từ khóa <code class="bg-slate-100 text-pink-600 px-1 py-0.5 rounded">X-API-KEY</code>.
+            Bạn có thể lấy API Key từ hệ thống quản trị của nền tảng.
+        </p>
+        <div class="bg-slate-800 rounded-lg p-4">
+            <pre><code class="language-http">GET /api/v1/telehub/user HTTP/1.1
+Host: cms.cataishop.shop
+X-API-KEY: DLR_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</code></pre>
+        </div>
+    </div>
+
+    <!-- GET USER INFO -->
+    <div class="endpoint border border-slate-200">
+        <div class="endpoint-header bg-slate-50">
+            <span class="method get">GET</span>
+            <span class="url">https://cms.cataishop.shop/api/v1/telehub/user</span>
+        </div>
+        <div class="endpoint-body">
+            <h3 class="text-xl mb-2">2. Lấy Thông Tin & Số Dư</h3>
+            <p class="text-slate-600 mb-4">API dùng để kiểm tra thông tin tài khoản và số dư hiện tại của Đại lý.</p>
+            
+            <h4 class="font-semibold mt-6 mb-2">Headers</h4>
+            <table class="param-table">
+                <tr><th>Key</th><th>Bắt buộc</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">X-API-KEY</td><td>Có</td><td>Chuỗi API Key xác thực tài khoản.</td></tr>
+            </table>
+
+            <h4 class="font-semibold mt-6 mb-2">Response Thành công (200 OK)</h4>
+            <pre><code class="language-json">{
+    "success": true,
+    "data": {
+        "full_name": "Nguyễn Văn A",
+        "username": "ZeroBit2k4",
+        "telegram_id": 7353915691,
+        "balance": 393195000.0,
+        "formatted_balance": "393.195.000 ₫"
+    }
+}</code></pre>
+        </div>
+    </div>
+
+    <!-- GET PRODUCTS -->
+    <div class="endpoint border border-slate-200">
+        <div class="endpoint-header bg-slate-50">
+            <span class="method get">GET</span>
+            <span class="url">https://cms.cataishop.shop/api/v1/telehub/products</span>
+        </div>
+        <div class="endpoint-body">
+            <h3 class="text-xl mb-2">3. Lấy Danh Sách Sản Phẩm</h3>
+            <p class="text-slate-600 mb-4">Lấy tất cả sản phẩm đang bán. Hệ thống tự động trả về <strong>giá sỉ riêng</strong> nếu đại lý được cài đặt giá sỉ, nếu không sẽ trả về giá bán lẻ mặc định.</p>
+            
+            <h4 class="font-semibold mt-6 mb-2">Headers</h4>
+            <table class="param-table">
+                <tr><th>Key</th><th>Bắt buộc</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">X-API-KEY</td><td>Có</td><td>Chuỗi API Key xác thực.</td></tr>
+            </table>
+
+            <h4 class="font-semibold mt-6 mb-2">Response Thành công (200 OK)</h4>
+            <pre><code class="language-json">{
+    "success": true,
+    "data": [
+        {
+            "id": 1,
+            "name": "Tài khoản Telegram Trust",
+            "description": "<p>Sản phẩm cực ngon ngâm lâu năm</p>",
+            "price": 10000,
+            "price_usd": null,
+            "retail_price": 15000,
+            "retail_price_usd": null,
+            "is_dealer_price": true,
+            "stock": 420
+        },
+        {
+            "id": 66,
+            "name": "Capcut Pro Team 7D",
+            "description": null,
+            "price": 10000,
+            "price_usd": null,
+            "retail_price": 10000,
+            "retail_price_usd": null,
+            "is_dealer_price": false,
+            "stock": 30
+        }
+    ]
+}</code></pre>
+            <p class="text-sm text-slate-500 mt-2"><strong>Ghi chú:</strong> Trường <code class="text-pink-600">price</code> là giá cuối cùng đại lý phải trả để mua. <code class="text-pink-600">is_dealer_price = true</code> nghĩa là đang được áp dụng mức chiết khấu sỉ. <code class="text-pink-600">stock</code> là số lượng sản phẩm có sẵn trong kho.</p>
+        </div>
+    </div>
+
+    <!-- POST BUY -->
+    <div class="endpoint border border-slate-200">
+        <div class="endpoint-header bg-slate-50">
+            <span class="method post">POST</span>
+            <span class="url">https://cms.cataishop.shop/api/v1/telehub/buy</span>
+        </div>
+        <div class="endpoint-body">
+            <h3 class="text-xl mb-2">4. Mua Tài Khoản</h3>
+            <p class="text-slate-600 mb-4">API thực hiện giao dịch thanh toán trừ tiền và xuất tài khoản ngay lập tức.</p>
+            
+            <h4 class="font-semibold mt-6 mb-2">Headers</h4>
+            <table class="param-table">
+                <tr><th>Key</th><th>Bắt buộc</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">X-API-KEY</td><td>Có</td><td>Chuỗi API Key xác thực.</td></tr>
+                <tr><td class="param-name">Content-Type</td><td>Có</td><td>application/json</td></tr>
+                <tr><td class="param-name">Accept</td><td>Có</td><td>application/json</td></tr>
+            </table>
+
+            <h4 class="font-semibold mt-6 mb-2">Body Request (JSON)</h4>
+            <table class="param-table">
+                <tr><th>Trường (Field)</th><th>Loại</th><th>Bắt buộc</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">product_id</td><td>Integer</td><td>Có</td><td>ID của sản phẩm cần mua (Lấy từ API danh sách sản phẩm)</td></tr>
+                <tr><td class="param-name">quantity</td><td>Integer</td><td>Có</td><td>Số lượng cần xuất (Lớn hơn 0).</td></tr>
+            </table>
+
+            <pre><code class="language-json">{
+    "product_id": 1,
+    "quantity": 2
+}</code></pre>
+
+            <h4 class="font-semibold mt-6 mb-2">Response Thành công (200 OK)</h4>
+            <pre><code class="language-json">{
+    "success": true,
+    "message": "Mua hàng thành công!",
+    "data": {
+        "order_id": 109,
+        "order_code": "APIX8Y2M",
+        "product_name": "Tên sản phẩm mẫu",
+        "quantity": 2,
+        "total_amount": 20000,
+        "balance_left": 393175000.0,
+        "accounts": [
+            "0331234567 | pass123 | note 1",
+            "0331234568 | pass456 | note 2"
+        ]
+    }
+}</code></pre>
+            <p class="text-sm text-slate-500 mt-2">Danh sách tài khoản được xuất ra sẽ nằm trong mảng `accounts` (mỗi phần tử là nội dung thông tin của 1 tài khoản, cách nhau bởi ký tự | theo định dạng xuất kho).</p>
+
+            <h4 class="font-semibold mt-6 mb-2 text-red-600">Response Lỗi (400 Bad Request)</h4>
+            <pre><code class="language-json">{
+    "success": false,
+    "message": "Số dư không đủ để thanh toán."
+}</code></pre>
+            <pre class="mt-2"><code class="language-json">{
+    "success": false,
+    "message": "Số lượng tài khoản trong kho không đủ."
+}</code></pre>
+        </div>
+    </div>
+
+    <!-- GET ORDERS -->
+    <div class="endpoint border border-slate-200">
+        <div class="endpoint-header bg-slate-50">
+            <span class="method get">GET</span>
+            <span class="url">https://cms.cataishop.shop/api/v1/telehub/orders</span>
+        </div>
+        <div class="endpoint-body">
+            <h3 class="text-xl mb-2">5. Lịch Sử Mua Hàng</h3>
+            <p class="text-slate-600 mb-4">Lấy danh sách các đơn hàng đã mua (có phân trang).</p>
+            
+            <h4 class="font-semibold mt-6 mb-2">Headers</h4>
+            <table class="param-table">
+                <tr><th>Key</th><th>Bắt buộc</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">X-API-KEY</td><td>Có</td><td>Chuỗi API Key xác thực.</td></tr>
+            </table>
+
+            <h4 class="font-semibold mt-6 mb-2">Query Parameters</h4>
+            <table class="param-table">
+                <tr><th>Tên tham số</th><th>Loại</th><th>Mặc định</th><th>Mô tả</th></tr>
+                <tr><td class="param-name">limit</td><td>Integer</td><td>20</td><td>Số lượng đơn hàng trên 1 trang.</td></tr>
+                <tr><td class="param-name">page</td><td>Integer</td><td>1</td><td>Trang hiện tại cần lấy.</td></tr>
+            </table>
+
+            <h4 class="font-semibold mt-6 mb-2">Response Thành công (200 OK)</h4>
+            <pre><code class="language-json">{
+    "success": true,
+    "data": [
+        {
+            "id": 109,
+            "code": "APIX8Y2M",
+            "total_amount": 20000,
+            "status": "completed",
+            "created_at": "2026-07-08 14:30:00",
+            "details": [
+                {
+                    "product_name": "Tên sản phẩm mẫu",
+                    "quantity": 2,
+                    "price": 10000
+                }
+            ],
+            "accounts": [
+                "0331234567 | pass123 | note 1",
+                "0331234568 | pass456 | note 2"
+            ]
+        }
+    ],
+    "meta": {
+        "current_page": 1,
+        "last_page": 5,
+        "total": 100
+    }
+}</code></pre>
+        </div>
+    </div>
+
+    <!-- Xử lý lỗi chung -->
+    <div class="bg-white rounded-xl shadow-sm p-8 mb-10 border border-slate-200">
+        <h2 class="text-2xl font-bold mb-4 text-red-600">5. Các Mã Lỗi (HTTP Status Codes)</h2>
+        <ul class="list-disc pl-5 text-slate-600 space-y-2">
+            <li><strong>200 OK:</strong> Request thành công.</li>
+            <li><strong>400 Bad Request:</strong> Sai dữ liệu đầu vào hoặc không đủ điều kiện mua (Hết tiền, hết hàng).</li>
+            <li><strong>401 Unauthorized:</strong> Không tìm thấy <code class="text-pink-600">X-API-KEY</code> hoặc Key không hợp lệ.</li>
+            <li><strong>404 Not Found:</strong> Không tìm thấy sản phẩm.</li>
+            <li><strong>500 Internal Server Error:</strong> Lỗi máy chủ, Transaction thất bại.</li>
+        </ul>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-http.min.js"></script>
+</body>
+</html>

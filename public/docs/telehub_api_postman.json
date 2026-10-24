@@ -1,0 +1,112 @@
+{
+	"info": {
+		"_postman_id": "b1b701d8-04f7-41eb-bc0e-00e123456789",
+		"name": "Telehub Third-Party API",
+		"description": "API Integration cho các Cộng Tác Viên (Dealer) mua tài khoản tự động.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Lấy thông tin & Số dư",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-API-KEY",
+						"value": "{{API_KEY}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{BASE_URL}}/api/v1/telehub/user",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"telehub",
+						"user"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Lấy danh sách Sản phẩm",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "X-API-KEY",
+						"value": "{{API_KEY}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{BASE_URL}}/api/v1/telehub/products",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"telehub",
+						"products"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Mua tài khoản",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "X-API-KEY",
+						"value": "{{API_KEY}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"product_id\": 1,\n    \"quantity\": 2\n}"
+				},
+				"url": {
+					"raw": "{{BASE_URL}}/api/v1/telehub/buy",
+					"host": [
+						"{{BASE_URL}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"telehub",
+						"buy"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "BASE_URL",
+			"value": "https://cms.phh.info.vn"
+		},
+		{
+			"key": "API_KEY",
+			"value": "DLR_YOUR_API_KEY_HERE"
+		}
+	]
+}

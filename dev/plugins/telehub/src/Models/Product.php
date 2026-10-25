@@ -33,6 +33,7 @@ class Product extends BaseModel
         'api_product_id',
         'api_cost_price',
         'api_stock',
+        'api_sold',
         'api_delivery_mode',
         'api_markup_percent',
     ];
@@ -42,6 +43,7 @@ class Product extends BaseModel
         'is_api_product' => 'boolean',
         'api_cost_price' => 'decimal:2',
         'api_stock' => 'integer',
+        'api_sold' => 'integer',
         'api_markup_percent' => 'decimal:2',
         'name' => SafeContent::class,
         'name_en' => SafeContent::class,

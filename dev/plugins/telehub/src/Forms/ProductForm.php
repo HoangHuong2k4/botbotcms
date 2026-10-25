@@ -90,6 +90,14 @@ class ProductForm extends FormAbstract
                     'rows' => 4,
                 ],
             ])
+            ->add('api_sold', NumberField::class, [
+                'label' => 'Số lượng đã bán (Hiển thị bot Telegram)',
+                'required' => false,
+                'value' => (int)($this->getModel()->api_sold ?? 0),
+                'help_block' => [
+                    'text' => 'Số lượng đã bán hiển thị trên bot Telegram. Tự động đồng bộ từ API (nếu có), hoặc bạn có thể tự nhập số uy tín theo ý muốn.',
+                ],
+            ])
             ->add('status', SelectField::class, StatusFieldOption::make())
             ->setBreakFieldPoint('status');
     }

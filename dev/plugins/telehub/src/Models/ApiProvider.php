@@ -230,6 +230,13 @@ class ApiProvider extends BaseModel
                         $stock = (int)($p['stock_count'] ?? $p['stock'] ?? $p['quantity'] ?? 0);
                     }
 
+                    $sold = 0;
+                    if (isset($p['availability']) && is_array($p['availability'])) {
+                        $sold = (int)($p['availability']['sold'] ?? 0);
+                    } else {
+                        $sold = (int)($p['sold_count'] ?? $p['sold'] ?? $p['sales'] ?? 0);
+                    }
+
                     $available = isset($p['available']) ? (bool)$p['available'] : ($stock > 0);
                     if ($availableOnly && (!$available || $stock <= 0)) {
                         continue;
@@ -242,6 +249,7 @@ class ApiProvider extends BaseModel
                         'name' => $p['name'] ?? $p['title'] ?? ('Sản phẩm ' . $pId),
                         'price' => $price,
                         'stock_count' => $stock,
+                        'sold_count' => $sold,
                         'available' => $available,
                         'delivery_mode' => $deliveryMode,
                         'category' => $p['category'] ?? null,

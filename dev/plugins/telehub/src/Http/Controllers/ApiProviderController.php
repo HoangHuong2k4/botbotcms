@@ -336,11 +336,16 @@ class ApiProviderController extends BaseController
 
             $targetStatus = (isset($item['status']) && in_array($item['status'], ['published', 'draft'])) ? $item['status'] : null;
 
+            $sold = (int) ($item['sold_count'] ?? 0);
+
             if ($product) {
                 $product->name = $item['name'];
                 $product->price = $salePrice;
                 $product->api_cost_price = $costPrice;
                 $product->api_stock = $stock;
+                if ($sold > 0) {
+                    $product->api_sold = $sold;
+                }
                 $product->api_delivery_mode = $deliveryMode;
                 $product->api_markup_percent = $markup;
                 if ($icon !== null && $icon !== '') {
@@ -370,6 +375,7 @@ class ApiProviderController extends BaseController
                 $product->api_product_id = $apiProdId;
                 $product->api_cost_price = $costPrice;
                 $product->api_stock = $stock;
+                $product->api_sold = $sold;
                 $product->api_delivery_mode = $deliveryMode;
                 $product->api_markup_percent = $markup;
                 $product->save();

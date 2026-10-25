@@ -110,6 +110,8 @@ class ApiProvider extends BaseModel
                     $this->currency = $data['currency'];
                 } elseif (!empty($data['walletCurrency'])) {
                     $this->currency = $data['walletCurrency'];
+                } else {
+                    $this->currency = 'VND';
                 }
 
                 $requesterName = $payload['requester']['name'] ?? $data['requester']['name'] ?? null;
@@ -172,9 +174,31 @@ class ApiProvider extends BaseModel
                 if (is_array($data) && array_is_list($data)) {
                     $rawList = $data;
                 } elseif (isset($data['data']['products']) && is_array($data['data']['products'])) {
-                    $rawList = $data['data']['products'];
+                    if (!array_is_list($data['data']['products'])) {
+                        foreach ($data['data']['products'] as $pName => $pInfo) {
+                            if (is_array($pInfo)) {
+                                $rawList[] = array_merge([
+                                    'product_id' => (string) $pName,
+                                    'name' => (string) $pName,
+                                ], $pInfo);
+                            }
+                        }
+                    } else {
+                        $rawList = $data['data']['products'];
+                    }
                 } elseif (isset($data['products']) && is_array($data['products'])) {
-                    $rawList = $data['products'];
+                    if (!array_is_list($data['products'])) {
+                        foreach ($data['products'] as $pName => $pInfo) {
+                            if (is_array($pInfo)) {
+                                $rawList[] = array_merge([
+                                    'product_id' => (string) $pName,
+                                    'name' => (string) $pName,
+                                ], $pInfo);
+                            }
+                        }
+                    } else {
+                        $rawList = $data['products'];
+                    }
                 } elseif (isset($data['data']) && is_array($data['data']) && array_is_list($data['data'])) {
                     $rawList = $data['data'];
                 }
@@ -182,8 +206,8 @@ class ApiProvider extends BaseModel
                 $products = [];
                 foreach ($rawList as $p) {
                     if (!is_array($p)) continue;
-                    // Support both product_id, productId, and id
-                    $pId = (string)($p['product_id'] ?? $p['productId'] ?? $p['id'] ?? '');
+                    // Support product_id, productId, id, and name fallback
+                    $pId = (string)($p['product_id'] ?? $p['productId'] ?? $p['id'] ?? $p['name'] ?? '');
                     if (!$pId) continue;
 
                     // Support price as number or as object { amount: 12345, currency: 'VND' }
@@ -259,6 +283,7 @@ class ApiProvider extends BaseModel
 
         $body = [
             'product_id' => $apiProductId,
+            'product_name' => $apiProductId, // Supports MinhAIS which requires product_name
             'quantity' => $quantity,
             'partner_ref' => $partnerRef,
             'request_id' => $partnerRef,
@@ -319,7 +344,7 @@ class ApiProvider extends BaseModel
                 }
 
                 $status = $respData['status'] ?? $json['order']['status'] ?? 'done';
-                $balanceAfter = $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? null;
+                $balanceAfter = $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
 
                 return [
                     'success' => true,

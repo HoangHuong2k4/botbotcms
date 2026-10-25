@@ -1164,6 +1164,9 @@
                         <button type="button" class="ap-btn ap-btn-sm ap-btn-cyan btn-apply-provider-preset" data-preset="canboso">
                             <i class="ti ti-brand-telegram"></i> Canboso (@Vincentrrrrr_Bot)
                         </button>
+                        <button type="button" class="ap-btn ap-btn-sm ap-btn-secondary btn-apply-provider-preset" data-preset="minhais">
+                            <i class="ti ti-robot"></i> MinhAIS (@minhais_8888_bot)
+                        </button>
                         <button type="button" class="ap-btn ap-btn-sm ap-btn-secondary btn-apply-provider-preset" data-preset="haji">
                             <i class="ti ti-shopping-bag"></i> Haji Shop
                         </button>
@@ -1770,6 +1773,16 @@
             endpoint_catalog: '/api/v2/telegram-buyer/products',
             endpoint_orders: '/api/v2/telegram-buyer/purchase',
             endpoint_balance: '/api/v2/telegram-buyer/balance'
+        },
+        minhais: {
+            name: 'MinhAIS (@minhais_8888_bot)',
+            base_url: 'https://api.hminhhosting.io.vn',
+            auth_type: 'header',
+            header_name: 'X-API-KEY',
+            partner_id: '',
+            endpoint_catalog: '/api/stock',
+            endpoint_orders: '/api/buy',
+            endpoint_balance: '/api/stock'
         },
         haji: {
             name: 'Haji Shop (@cataishop_bot)',

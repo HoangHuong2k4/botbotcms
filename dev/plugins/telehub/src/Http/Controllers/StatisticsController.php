@@ -260,6 +260,7 @@ class StatisticsController extends BaseController
         }
 
         $comboStats = (clone $comboStatsQ)
+            ->leftJoinSub($warrantiesSub, 'w', 'w.order_id', '=', 'o.id')
             ->select(
                 'pc.id as combo_id',
                 'pc.type as combo_type',
@@ -269,9 +270,9 @@ class StatisticsController extends BaseController
                 'pc.bonus_qty as combo_bonus_qty',
                 'pc.label',
                 DB::raw("COUNT(od.id) as usage_count"),
-                DB::raw("SUM(od.quantity) as total_acc_sold"),
-                DB::raw("SUM(od.bonus_qty) as total_bonus_given"),
-                DB::raw("SUM(o.total_amount) as combo_revenue")
+                DB::raw("SUM(od.quantity - IFNULL(od.bonus_qty, 0)) as total_acc_sold"),
+                DB::raw("SUM(IFNULL(od.bonus_qty, 0)) as total_bonus_given"),
+                DB::raw("SUM(o.total_amount) - IFNULL(SUM(w.total_refund), 0) as combo_revenue")
             )
             ->groupBy('pc.id', 'pc.type', 'pc.min_quantity', 'pc.discount_percent', 'pc.discount_amount', 'pc.bonus_qty', 'pc.label')
             ->orderBy('usage_count', 'desc')

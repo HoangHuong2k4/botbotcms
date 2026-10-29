@@ -167,6 +167,8 @@ export default defineComponent({
                 filter.dateRange = [today.startOf('week'), today];
             } else if (type === 'this_month') {
                 filter.dateRange = [today.startOf('month'), today];
+            } else if (type === 'this_year') {
+                filter.dateRange = [today.startOf('year'), today];
             }
             applyFilter();
         }
@@ -268,6 +270,7 @@ export default defineComponent({
                     <a-button size="small" type="dashed" @click="setDateRange('yesterday')">Hôm qua</a-button>
                     <a-button size="small" type="dashed" @click="setDateRange('this_week')">Tuần này</a-button>
                     <a-button size="small" type="dashed" @click="setDateRange('this_month')">Tháng này</a-button>
+                    <a-button size="small" type="dashed" @click="setDateRange('this_year')">Năm nay</a-button>
                 </a-space>
             </div>
             

@@ -71,6 +71,12 @@ class ApiProvider extends BaseModel
 
         return Http::baseUrl($baseUrl)
             ->withHeaders($headers)
+            ->withOptions([
+                'connect_timeout' => 8,
+                'curl' => [
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                ],
+            ])
             ->timeout($timeout);
     }
 
@@ -86,7 +92,11 @@ class ApiProvider extends BaseModel
                 'key' => trim($this->api_key),
             ];
 
-            $response = $this->httpClient(10)->get($endpoint, $queryParams);
+            $response = $this->httpClient(10)
+                ->retry(2, 500, function ($exception) {
+                    return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                }, throw: false)
+                ->get($endpoint, $queryParams);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -166,7 +176,11 @@ class ApiProvider extends BaseModel
                 'key' => trim($this->api_key),
             ];
 
-            $response = $this->httpClient(20)->get($endpoint, $queryParams);
+            $response = $this->httpClient(20)
+                ->retry(2, 500, function ($exception) {
+                    return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                }, throw: false)
+                ->get($endpoint, $queryParams);
 
             if ($response->successful()) {
                 $data = $response->json();
@@ -312,6 +326,9 @@ class ApiProvider extends BaseModel
 
             $response = $this->httpClient(35)
                 ->withHeaders($headers)
+                ->retry(2, 1000, function ($exception) {
+                    return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                }, throw: false)
                 ->post($endpoint, $body);
 
             $json = $response->json();
@@ -353,6 +370,12 @@ class ApiProvider extends BaseModel
 
                 $status = $respData['status'] ?? $json['order']['status'] ?? 'done';
                 $balanceAfter = $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
+
+                if ($balanceAfter !== null) {
+                    $this->balance = (float) $balanceAfter;
+                    $this->last_sync_at = now();
+                    $this->save();
+                }
 
                 return [
                     'success' => true,

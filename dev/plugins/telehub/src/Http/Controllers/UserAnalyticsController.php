@@ -154,6 +154,16 @@ class UserAnalyticsController extends BaseController
         return "{$alias}.status = 'completed' AND {$alias}.type != 'warranty' AND {$alias}.created_at IS NOT NULL";
     }
 
+    private function warrantyJoin(string $orderAlias = 'o'): string
+    {
+        return "LEFT JOIN (SELECT order_id, SUM(refund_amount) as total_refund FROM telehub_warranties WHERE type = 'refund' GROUP BY order_id) w ON w.order_id = {$orderAlias}.id";
+    }
+
+    private function netRevenueExpr(string $orderAlias = 'o'): string
+    {
+        return "({$orderAlias}.total_amount - IFNULL(w.total_refund, 0))";
+    }
+
     private function channelExpr(string $alias = 'o'): string
     {
         return "CASE WHEN {$alias}.code LIKE 'API%' THEN 'api' ELSE 'bot' END";
@@ -236,25 +246,22 @@ class UserAnalyticsController extends BaseController
         [$t, $b] = $this->tenantWhere('o');
         $s = $start->toDateTimeString();
         $e = $end->toDateTimeString();
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
 
         $row = DB::selectOne(
             "SELECT COUNT(*) orders,
                     COUNT(DISTINCT o.customer_id) buyers,
-                    IFNULL(SUM(o.total_amount),0) revenue,
-                    IFNULL(SUM(CASE WHEN o.code LIKE 'API%' THEN o.total_amount ELSE 0 END),0) api_revenue,
+                    IFNULL(SUM({$revExpr}),0) revenue,
+                    IFNULL(SUM(CASE WHEN o.code LIKE 'API%' THEN {$revExpr} ELSE 0 END),0) api_revenue,
                     SUM(o.code LIKE 'API%') api_orders,
-                    COUNT(DISTINCT CASE WHEN o.code LIKE 'API%' THEN o.customer_id END) api_buyers
+                    COUNT(DISTINCT CASE WHEN o.code LIKE 'API%' THEN o.customer_id END) api_buyers,
+                    IFNULL(SUM(w.total_refund),0) refund
                FROM telehub_orders o
+               {$wJoin}
               WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t}",
             array_merge([$s, $e], $b)
         );
-
-        $refund = DB::selectOne(
-            "SELECT IFNULL(SUM(w.refund_amount),0) r FROM telehub_warranties w
-               JOIN telehub_orders o ON o.id = w.order_id
-              WHERE w.type = 'refund' AND {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t}",
-            array_merge([$s, $e], $b)
-        )->r;
 
         $repeat = DB::selectOne(
             "SELECT COUNT(*) n FROM (
@@ -277,7 +284,8 @@ class UserAnalyticsController extends BaseController
         $active  = $this->activeCount($start, $end);
         $orders  = (int) $row->orders;
         $buyers  = (int) $row->buyers;
-        $revenue = (float) $row->revenue - (float) $refund;
+        $revenue = (float) $row->revenue;
+        $refund  = (float) $row->refund;
 
         return [
             'active'        => $active,
@@ -287,7 +295,7 @@ class UserAnalyticsController extends BaseController
             'repeat_buyers' => (int) $repeat,
             'orders'        => $orders,
             'revenue'       => $revenue,
-            'refund'        => (float) $refund,
+            'refund'        => $refund,
             'aov'           => $orders ? round($revenue / $orders) : 0,
             'arpu'          => $buyers ? round($revenue / $buyers) : 0,
             'orders_per_buyer' => $buyers ? round($orders / $buyers, 2) : 0,
@@ -296,7 +304,7 @@ class UserAnalyticsController extends BaseController
             'api_orders'    => (int) $row->api_orders,
             'api_buyers'    => (int) $row->api_buyers,
             'api_revenue'   => (float) $row->api_revenue,
-            'api_share'     => $this->pct((float) $row->api_revenue, (float) $row->revenue),
+            'api_share'     => $this->pct((float) $row->api_revenue, (float) ($revenue + $refund > 0 ? $revenue + $refund : 1)),
         ];
     }
 
@@ -306,14 +314,16 @@ class UserAnalyticsController extends BaseController
         $start = Carbon::now()->startOfWeek(Carbon::MONDAY)->subWeeks(11);
         [$src, $b] = $this->activitySource($start, $end);
         [$t, $bt] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
 
         $active = collect(DB::select(
             "SELECT YEARWEEK(d, 3) k, COUNT(DISTINCT customer_id) n FROM ({$src}) x GROUP BY k", $b
         ))->keyBy('k');
 
         $buyers = collect(DB::select(
-            "SELECT YEARWEEK(o.created_at, 3) k, COUNT(DISTINCT o.customer_id) n, SUM(o.total_amount) rev
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
+            "SELECT YEARWEEK(o.created_at, 3) k, COUNT(DISTINCT o.customer_id) n, SUM({$revExpr}) rev
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $bt)
         ))->keyBy('k');
 
@@ -341,14 +351,16 @@ class UserAnalyticsController extends BaseController
         $start = Carbon::now()->startOfMonth()->subMonths(11);
         [$src, $b] = $this->activitySource($start, $end);
         [$t, $bt] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
 
         $active = collect(DB::select(
             "SELECT DATE_FORMAT(d, '%Y-%m') k, COUNT(DISTINCT customer_id) n FROM ({$src}) x GROUP BY k", $b
         ))->keyBy('k');
 
         $buyers = collect(DB::select(
-            "SELECT DATE_FORMAT(o.created_at, '%Y-%m') k, COUNT(DISTINCT o.customer_id) n, SUM(o.total_amount) rev, COUNT(*) orders
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
+            "SELECT DATE_FORMAT(o.created_at, '%Y-%m') k, COUNT(DISTINCT o.customer_id) n, SUM({$revExpr}) rev, COUNT(*) orders
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $bt)
         ))->keyBy('k');
 
@@ -374,12 +386,14 @@ class UserAnalyticsController extends BaseController
     {
         [$src, $b] = $this->activitySource($start, $end);
         [$t, $bt] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
 
         $active = collect(DB::select("SELECT d k, COUNT(DISTINCT customer_id) n FROM ({$src}) x GROUP BY d", $b))
             ->keyBy(fn ($r) => (string) $r->k);
         $orders = collect(DB::select(
-            "SELECT DATE(o.created_at) k, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM(o.total_amount) rev
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
+            "SELECT DATE(o.created_at) k, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM({$revExpr}) rev
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY k",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $bt)
         ))->keyBy(fn ($r) => (string) $r->k);
 
@@ -400,10 +414,13 @@ class UserAnalyticsController extends BaseController
     private function hourly(Carbon $start, Carbon $end): array
     {
         [$t, $b] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $rows = collect(DB::select(
-            "SELECT HOUR(o.created_at) h, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM(o.total_amount) rev,
+            "SELECT HOUR(o.created_at) h, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM({$revExpr}) rev,
                     SUM(o.code LIKE 'API%') api_orders
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY h",
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY h",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $b)
         ))->keyBy('h');
 
@@ -439,9 +456,12 @@ class UserAnalyticsController extends BaseController
     private function weekday(Carbon $start, Carbon $end): array
     {
         [$t, $b] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $rows = collect(DB::select(
-            "SELECT WEEKDAY(o.created_at) wd, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM(o.total_amount) rev
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY wd",
+            "SELECT WEEKDAY(o.created_at) wd, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM({$revExpr}) rev
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY wd",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $b)
         ))->keyBy('wd');
 
@@ -479,9 +499,12 @@ class UserAnalyticsController extends BaseController
     private function channels(Carbon $start, Carbon $end): array
     {
         [$t, $b] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $rows = DB::select(
-            "SELECT {$this->channelExpr()} ch, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM(o.total_amount) rev
-               FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY ch",
+            "SELECT {$this->channelExpr()} ch, COUNT(*) orders, COUNT(DISTINCT o.customer_id) buyers, SUM({$revExpr}) rev
+               FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY ch",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $b)
         );
         $out = ['bot' => ['orders' => 0, 'buyers' => 0, 'revenue' => 0], 'api' => ['orders' => 0, 'buyers' => 0, 'revenue' => 0]];
@@ -494,6 +517,9 @@ class UserAnalyticsController extends BaseController
     private function segments(Carbon $start, Carbon $end): array
     {
         [$t, $b] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $rows = DB::select(
             "SELECT CASE WHEN n = 1 THEN '1 đơn'
                          WHEN n BETWEEN 2 AND 3 THEN '2–3 đơn'
@@ -501,7 +527,7 @@ class UserAnalyticsController extends BaseController
                          WHEN n BETWEEN 11 AND 50 THEN '11–50 đơn'
                          ELSE '50+ đơn' END seg,
                     MIN(n) sort_key, COUNT(*) customers, SUM(rev) revenue
-               FROM (SELECT o.customer_id, COUNT(*) n, SUM(o.total_amount) rev FROM telehub_orders o
+               FROM (SELECT o.customer_id, COUNT(*) n, SUM({$revExpr}) rev FROM telehub_orders o {$wJoin}
                       WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} GROUP BY o.customer_id) x
               GROUP BY seg ORDER BY sort_key",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $b)
@@ -558,8 +584,11 @@ class UserAnalyticsController extends BaseController
         $sortBy = strtolower((string) $request->input('buyer_sort', 'revenue'));
         $sortDir = strtolower((string) $request->input('buyer_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $total = (float) DB::selectOne(
-            "SELECT IFNULL(SUM(o.total_amount),0) s FROM telehub_orders o WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t}",
+            "SELECT IFNULL(SUM({$revExpr}),0) s FROM telehub_orders o {$wJoin} WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t}",
             array_merge([$s, $e], $b)
         )->s;
 
@@ -602,11 +631,12 @@ class UserAnalyticsController extends BaseController
 
         $rows = DB::select(
             "SELECT c.id, c.full_name, c.username, c.telegram_id, c.is_dealer, c.balance,
-                    COUNT(*) orders, SUM(o.total_amount) revenue, IFNULL(SUM(q.qty),0) qty,
+                    COUNT(*) orders, SUM({$revExpr}) revenue, IFNULL(SUM(q.qty),0) qty,
                     SUM(o.code LIKE 'API%') api_orders, MAX(o.created_at) last_order, MIN(o.created_at) first_order
                FROM telehub_orders o
                JOIN telehub_bot_customers c ON c.id = o.customer_id
                LEFT JOIN (SELECT order_id, SUM(quantity) qty FROM telehub_order_details GROUP BY order_id) q ON q.order_id = o.id
+               {$wJoin}
               WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t} {$searchWhere}
               GROUP BY c.id, c.full_name, c.username, c.telegram_id, c.is_dealer, c.balance
               ORDER BY {$orderCol} {$sortDir}
@@ -652,6 +682,8 @@ class UserAnalyticsController extends BaseController
         [$t, $b] = $this->tenantWhere('o');
         $s = $start->toDateTimeString();
         $e = $end->toDateTimeString();
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
 
         $page = max(1, (int) $request->input('api_page', 1));
         $perPage = max(5, min(100, (int) $request->input('api_per_page', 15)));
@@ -660,7 +692,7 @@ class UserAnalyticsController extends BaseController
         $sortDir = strtolower((string) $request->input('api_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $total = (float) DB::selectOne(
-            "SELECT IFNULL(SUM(o.total_amount),0) s FROM telehub_orders o
+            "SELECT IFNULL(SUM({$revExpr}),0) s FROM telehub_orders o {$wJoin}
               WHERE {$this->revenueWhere()} AND o.code LIKE 'API%' AND o.created_at BETWEEN ? AND ? {$t}",
             array_merge([$s, $e], $b)
         )->s;
@@ -703,7 +735,7 @@ class UserAnalyticsController extends BaseController
 
         $rows = DB::select(
             "SELECT c.id, c.full_name, c.username, c.telegram_id, c.balance, (c.api_key IS NOT NULL) has_key,
-                    COUNT(*) orders, SUM(o.total_amount) revenue, IFNULL(SUM(q.qty),0) qty,
+                    COUNT(*) orders, SUM({$revExpr}) revenue, IFNULL(SUM(q.qty),0) qty,
                     COUNT(DISTINCT DATE(o.created_at)) active_days, MAX(o.created_at) last_order,
                     (SELECT COUNT(DISTINCT d2.product_id) FROM telehub_order_details d2
                        JOIN telehub_orders o2 ON o2.id = d2.order_id
@@ -711,6 +743,7 @@ class UserAnalyticsController extends BaseController
                FROM telehub_orders o
                JOIN telehub_bot_customers c ON c.id = o.customer_id
                LEFT JOIN (SELECT order_id, SUM(quantity) qty FROM telehub_order_details GROUP BY order_id) q ON q.order_id = o.id
+               {$wJoin}
               WHERE {$this->revenueWhere()} AND o.code LIKE 'API%' AND o.created_at BETWEEN ? AND ? {$t} {$searchWhere}
               GROUP BY c.id, c.full_name, c.username, c.telegram_id, c.balance, c.api_key
               ORDER BY {$orderCol} {$sortDir}
@@ -754,13 +787,20 @@ class UserAnalyticsController extends BaseController
         [$t, $b] = $this->tenantWhere('o');
         $rows = DB::select(
             "SELECT p.id, p.name, COUNT(DISTINCT o.customer_id) buyers, COUNT(DISTINCT o.id) orders,
-                    SUM(d.quantity) qty, SUM(o.total_amount) revenue,
+                    SUM(d.quantity) qty, SUM(o.total_amount - IFNULL(wp.total_refund, 0)) revenue,
                     SUM(o.code LIKE 'API%') api_orders
                FROM telehub_orders o
                JOIN telehub_order_details d ON d.order_id = o.id
                JOIN telehub_products p ON p.id = d.product_id
+               LEFT JOIN (
+                   SELECT w.order_id, i.product_id, SUM(w.refund_amount) as total_refund
+                   FROM telehub_warranties w
+                   JOIN telehub_product_items i ON i.id = w.product_item_id
+                   WHERE w.type = 'refund'
+                   GROUP BY w.order_id, i.product_id
+               ) wp ON wp.order_id = o.id AND wp.product_id = p.id
               WHERE {$this->revenueWhere()} AND o.created_at BETWEEN ? AND ? {$t}
-              GROUP BY p.id, p.name ORDER BY buyers DESC, revenue DESC LIMIT 12",
+              GROUP BY p.id, p.name ORDER BY revenue DESC, buyers DESC LIMIT 12",
             array_merge([$start->toDateTimeString(), $end->toDateTimeString()], $b)
         );
         return array_map(fn ($r) => [
@@ -773,12 +813,16 @@ class UserAnalyticsController extends BaseController
     private function atRisk(): array
     {
         [$t, $b] = $this->tenantWhere('o');
+        $wJoin = $this->warrantyJoin('o');
+        $revExpr = $this->netRevenueExpr('o');
+
         $rows = DB::select(
             "SELECT c.id, c.full_name, c.username, c.telegram_id, c.is_dealer, c.balance,
-                    COUNT(*) orders, SUM(o.total_amount) revenue, MAX(o.created_at) last_order,
+                    COUNT(*) orders, SUM({$revExpr}) revenue, MAX(o.created_at) last_order,
                     DATEDIFF(NOW(), MAX(o.created_at)) days_since
                FROM telehub_orders o
                JOIN telehub_bot_customers c ON c.id = o.customer_id
+               {$wJoin}
               WHERE {$this->revenueWhere()} {$t}
               GROUP BY c.id, c.full_name, c.username, c.telegram_id, c.is_dealer, c.balance
              HAVING days_since >= 14 AND orders >= 2

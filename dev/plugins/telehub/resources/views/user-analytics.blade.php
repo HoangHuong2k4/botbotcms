@@ -1145,13 +1145,20 @@
     const fmtNum = (n) => new Intl.NumberFormat('vi-VN').format(n || 0);
     const fmtMoney = (n) => fmtNum(Math.round(n || 0)) + 'đ';
 
+    const formatYMD = d => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     function initDates() {
         const to = new Date();
         const from = new Date();
         from.setDate(to.getDate() - 29);
 
-        document.getElementById('ua-date-to').value = to.toISOString().split('T')[0];
-        document.getElementById('ua-date-from').value = from.toISOString().split('T')[0];
+        document.getElementById('ua-date-to').value = formatYMD(to);
+        document.getElementById('ua-date-from').value = formatYMD(from);
     }
 
     async function loadData() {
@@ -1793,7 +1800,7 @@
 
             const p = this.getAttribute('data-days');
             const to = new Date();
-            const from = new Date();
+            let from = new Date();
 
             if (p === '7') {
                 from.setDate(to.getDate() - 6);
@@ -1802,11 +1809,11 @@
             } else if (p === 'this_month') {
                 from.setDate(1);
             } else if (p === 'all') {
-                from.setMonth(0, 1);
+                from = new Date(to.getFullYear(), 0, 1);
             }
 
-            document.getElementById('ua-date-to').value = to.toISOString().split('T')[0];
-            document.getElementById('ua-date-from').value = from.toISOString().split('T')[0];
+            document.getElementById('ua-date-to').value = formatYMD(to);
+            document.getElementById('ua-date-from').value = formatYMD(from);
             loadData();
         });
     });

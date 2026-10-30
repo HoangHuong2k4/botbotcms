@@ -52,12 +52,42 @@ class UserAnalyticsController extends BaseController
 
         $this->hasActivityTable = Schema::hasTable('telehub_customer_activities');
 
-        $end   = $request->filled('date_to')
-            ? Carbon::parse($request->input('date_to'))->endOfDay()
-            : Carbon::now()->endOfDay();
-        $start = $request->filled('date_from')
-            ? Carbon::parse($request->input('date_from'))->startOfDay()
-            : $end->copy()->subDays(29)->startOfDay();
+        $period = $request->input('period');
+        if ($period) {
+            $now = Carbon::now();
+            if ($period === 'today') {
+                $start = $now->copy()->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } elseif ($period === 'yesterday') {
+                $start = $now->copy()->subDay()->startOfDay();
+                $end   = $now->copy()->subDay()->endOfDay();
+            } elseif ($period === 'this_week') {
+                $start = $now->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } elseif ($period === '7' || $period === '7d') {
+                $start = $now->copy()->subDays(6)->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } elseif ($period === 'this_month') {
+                $start = $now->copy()->startOfMonth()->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } elseif ($period === '30' || $period === '30d') {
+                $start = $now->copy()->subDays(29)->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } elseif ($period === 'all' || $period === 'this_year') {
+                $start = $now->copy()->startOfYear()->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            } else {
+                $start = $now->copy()->startOfMonth()->startOfDay();
+                $end   = $now->copy()->endOfDay();
+            }
+        } else {
+            $end   = $request->filled('date_to')
+                ? Carbon::parse($request->input('date_to'))->endOfDay()
+                : Carbon::now()->endOfDay();
+            $start = $request->filled('date_from')
+                ? Carbon::parse($request->input('date_from'))->startOfDay()
+                : Carbon::now()->startOfMonth()->startOfDay();
+        }
 
         if ($start->gt($end)) {
             [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];

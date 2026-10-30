@@ -28,11 +28,15 @@ export default defineComponent({
             }
         }
 
+        const activePreset = ref(props.initDateFrom ? null : (props.initMonthYear ? null : 'this_month'))
+        const initialStart = props.initDateFrom ? dayjs(props.initDateFrom) : (props.initMonthYear ? null : dayjs().startOf('month'))
+        const initialEnd   = props.initDateTo ? dayjs(props.initDateTo) : (props.initMonthYear ? null : dayjs())
+
         const filter = reactive({
-            dateRange: [],
-            monthYearObj: null,
-            date_from:  props.initDateFrom,
-            date_to:    props.initDateTo,
+            dateRange: initialStart && initialEnd ? [initialStart, initialEnd] : [],
+            monthYearObj: props.initMonthYear ? dayjs(props.initMonthYear, 'YYYY-MM') : null,
+            date_from:  initialStart ? initialStart.format('YYYY-MM-DD') : '',
+            date_to:    initialEnd ? initialEnd.format('YYYY-MM-DD') : '',
             month_year: props.initMonthYear,
             tenant_id:  props.initTenantId ? props.initTenantId : undefined,
             customer_id: [],
@@ -155,8 +159,19 @@ export default defineComponent({
             })
         }
         
+        function onDateRangeChange() {
+            filter.monthYearObj = null;
+            activePreset.value = null;
+        }
+
+        function onMonthChange() {
+            filter.dateRange = [];
+            activePreset.value = null;
+        }
+
         function setDateRange(type) {
             filter.monthYearObj = null;
+            activePreset.value = type;
             const today = dayjs();
             if (type === 'today') {
                 filter.dateRange = [today, today];
@@ -164,10 +179,15 @@ export default defineComponent({
                 const yesterday = today.subtract(1, 'day');
                 filter.dateRange = [yesterday, yesterday];
             } else if (type === 'this_week') {
-                filter.dateRange = [today.startOf('week'), today];
+                const monday = today.day() === 0 ? today.subtract(6, 'day') : today.day(1);
+                filter.dateRange = [monday, today];
+            } else if (type === '7') {
+                filter.dateRange = [today.subtract(6, 'day'), today];
             } else if (type === 'this_month') {
                 filter.dateRange = [today.startOf('month'), today];
-            } else if (type === 'this_year') {
+            } else if (type === '30') {
+                filter.dateRange = [today.subtract(29, 'day'), today];
+            } else if (type === 'this_year' || type === 'all') {
                 filter.dateRange = [today.startOf('year'), today];
             }
             applyFilter();
@@ -191,16 +211,19 @@ export default defineComponent({
         }
 
         function resetFilter() {
-            filter.date_from   = ''
-            filter.date_to     = ''
-            filter.month_year  = ''
-            filter.tenant_id   = undefined
-            filter.customer_id = []
-            filter.product_id  = []
-            filter.dateRange   = []
-            filter.monthYearObj = null
-            searchCustomer.value = ''
-            fetchData()
+            activePreset.value = 'this_month';
+            const today = dayjs();
+            const start = today.startOf('month');
+            filter.dateRange = [start, today];
+            filter.date_from = start.format('YYYY-MM-DD');
+            filter.date_to = today.format('YYYY-MM-DD');
+            filter.month_year = '';
+            filter.monthYearObj = null;
+            filter.tenant_id = undefined;
+            filter.customer_id = [];
+            filter.product_id = [];
+            searchCustomer.value = '';
+            fetchData();
         }
 
         onMounted(() => {
@@ -250,7 +273,8 @@ export default defineComponent({
             filteredCustomers, searchCustomer,
             comboStats, totalComboOrders, totalBonusGiven, comboColumns,
             fmt, applyFilter, resetFilter, setDateRange,
-            antTheme, customerColumns, innerColumns, topProductColumns, tenantColumns
+            antTheme, customerColumns, innerColumns, topProductColumns, tenantColumns,
+            activePreset, onDateRangeChange, onMonthChange,
         }
     },
 })
@@ -265,12 +289,14 @@ export default defineComponent({
                 <span style="font-size:13px; font-weight:700; color:rgba(147,197,253,.8); text-transform: uppercase;">
                     <i class="ti ti-adjustments-horizontal me-1"></i> Bộ lọc thống kê nâng cao
                 </span>
-                <a-space>
-                    <a-button size="small" type="dashed" @click="setDateRange('today')">Hôm nay</a-button>
-                    <a-button size="small" type="dashed" @click="setDateRange('yesterday')">Hôm qua</a-button>
-                    <a-button size="small" type="dashed" @click="setDateRange('this_week')">Tuần này</a-button>
-                    <a-button size="small" type="dashed" @click="setDateRange('this_month')">Tháng này</a-button>
-                    <a-button size="small" type="dashed" @click="setDateRange('this_year')">Năm nay</a-button>
+                <a-space wrap>
+                    <a-button size="small" :type="activePreset === 'today' ? 'primary' : 'dashed'" @click="setDateRange('today')">Hôm nay</a-button>
+                    <a-button size="small" :type="activePreset === 'yesterday' ? 'primary' : 'dashed'" @click="setDateRange('yesterday')">Hôm qua</a-button>
+                    <a-button size="small" :type="activePreset === 'this_week' ? 'primary' : 'dashed'" @click="setDateRange('this_week')">Tuần này</a-button>
+                    <a-button size="small" :type="activePreset === 'this_month' ? 'primary' : 'dashed'" @click="setDateRange('this_month')">Tháng này</a-button>
+                    <a-button size="small" :type="activePreset === '7' ? 'primary' : 'dashed'" @click="setDateRange('7')">7 ngày</a-button>
+                    <a-button size="small" :type="activePreset === '30' ? 'primary' : 'dashed'" @click="setDateRange('30')">30 ngày</a-button>
+                    <a-button size="small" :type="(activePreset === 'this_year' || activePreset === 'all') ? 'primary' : 'dashed'" @click="setDateRange('this_year')">Năm nay</a-button>
                 </a-space>
             </div>
             
@@ -281,7 +307,7 @@ export default defineComponent({
                         v-model:value="filter.dateRange" 
                         format="DD/MM/YYYY" 
                         style="width: 100%" 
-                        @change="filter.monthYearObj = null"
+                        @change="onDateRangeChange"
                     />
                 </a-col>
                 
@@ -292,7 +318,7 @@ export default defineComponent({
                         picker="month" 
                         format="MM/YYYY" 
                         style="width: 100%" 
-                        @change="filter.dateRange = []"
+                        @change="onMonthChange"
                     />
                 </a-col>
 

@@ -687,9 +687,12 @@
         <div class="ua-controls">
             <!-- Preset Buttons -->
             <div class="ua-btn-group">
+                <button type="button" class="preset-btn" data-days="today">Hôm nay</button>
+                <button type="button" class="preset-btn" data-days="yesterday">Hôm qua</button>
+                <button type="button" class="preset-btn" data-days="this_week">Tuần này</button>
+                <button type="button" class="preset-btn active" data-days="this_month">Tháng này</button>
                 <button type="button" class="preset-btn" data-days="7">7 ngày</button>
-                <button type="button" class="preset-btn active" data-days="30">30 ngày</button>
-                <button type="button" class="preset-btn" data-days="this_month">Tháng này</button>
+                <button type="button" class="preset-btn" data-days="30">30 ngày</button>
                 <button type="button" class="preset-btn" data-days="all">Năm nay</button>
             </div>
 
@@ -1154,8 +1157,7 @@
 
     function initDates() {
         const to = new Date();
-        const from = new Date();
-        from.setDate(to.getDate() - 29);
+        const from = new Date(to.getFullYear(), to.getMonth(), 1);
 
         document.getElementById('ua-date-to').value = formatYMD(to);
         document.getElementById('ua-date-from').value = formatYMD(from);
@@ -1802,13 +1804,24 @@
             const to = new Date();
             let from = new Date();
 
-            if (p === '7') {
+            if (p === 'today') {
+                from = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+            } else if (p === 'yesterday') {
+                const y = new Date();
+                y.setDate(to.getDate() - 1);
+                from = new Date(y.getFullYear(), y.getMonth(), y.getDate());
+                to.setDate(to.getDate() - 1);
+            } else if (p === 'this_week') {
+                const day = to.getDay();
+                const diff = day === 0 ? 6 : day - 1; // Monday start
+                from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - diff);
+            } else if (p === '7') {
                 from.setDate(to.getDate() - 6);
+            } else if (p === 'this_month') {
+                from = new Date(to.getFullYear(), to.getMonth(), 1);
             } else if (p === '30') {
                 from.setDate(to.getDate() - 29);
-            } else if (p === 'this_month') {
-                from.setDate(1);
-            } else if (p === 'all') {
+            } else if (p === 'all' || p === 'this_year') {
                 from = new Date(to.getFullYear(), 0, 1);
             }
 
@@ -1816,6 +1829,16 @@
             document.getElementById('ua-date-from').value = formatYMD(from);
             loadData();
         });
+    });
+
+    ['ua-date-from', 'ua-date-to'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', () => {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                loadData();
+            });
+        }
     });
 
     document.getElementById('ua-btn-refresh').addEventListener('click', loadData);

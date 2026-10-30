@@ -53,6 +53,7 @@ class StatisticsController extends BaseController
         $tenantId   = $request->input("tenant_id");
         $customerIds = $request->input("customer_id");
         $productIds  = $request->input("product_id");
+        $period      = $request->input("period");
 
         // Normalize to array
         if ($customerIds && !is_array($customerIds)) {
@@ -62,13 +63,42 @@ class StatisticsController extends BaseController
             $productIds = explode(',', $productIds);
         }
 
-        if ($monthYear) {
+        if ($period) {
+            $now = Carbon::now();
+            if ($period === 'today') {
+                $startDate = $now->copy()->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } elseif ($period === 'yesterday') {
+                $startDate = $now->copy()->subDay()->startOfDay();
+                $endDate   = $now->copy()->subDay()->endOfDay();
+            } elseif ($period === 'this_week') {
+                $startDate = $now->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } elseif ($period === '7' || $period === '7d') {
+                $startDate = $now->copy()->subDays(6)->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } elseif ($period === 'this_month') {
+                $startDate = $now->copy()->startOfMonth()->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } elseif ($period === '30' || $period === '30d') {
+                $startDate = $now->copy()->subDays(29)->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } elseif ($period === 'all' || $period === 'this_year') {
+                $startDate = $now->copy()->startOfYear()->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            } else {
+                $startDate = $now->copy()->startOfMonth()->startOfDay();
+                $endDate   = $now->copy()->endOfDay();
+            }
+        } elseif ($monthYear) {
             $dateFrom = Carbon::createFromFormat("Y-m", $monthYear)->startOfMonth()->toDateString();
             $dateTo   = Carbon::createFromFormat("Y-m", $monthYear)->endOfMonth()->toDateString();
+            $startDate = Carbon::parse($dateFrom)->startOfDay();
+            $endDate   = Carbon::parse($dateTo)->endOfDay();
+        } else {
+            $startDate = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->startOfMonth()->startOfDay();
+            $endDate   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()    : Carbon::now()->endOfDay();
         }
-
-        $startDate = $dateFrom ? Carbon::parse($dateFrom)->startOfDay() : Carbon::now()->startOfMonth()->startOfDay();
-        $endDate   = $dateTo   ? Carbon::parse($dateTo)->endOfDay()    : Carbon::now()->endOfDay();
 
         // ─── Base order query ─────────────────────────────────────────
         $baseQ = Order::from("telehub_orders")
@@ -185,6 +215,10 @@ class StatisticsController extends BaseController
                 "unit_price_vnd" => (float)$row->unit_price_vnd,
             ];
         }
+        foreach ($customerStats as &$cStat) {
+            $cStat["products_count"] = count($cStat["products"]);
+        }
+        unset($cStat);
         usort($customerStats, fn($a, $b) => $b["grand_total"] <=> $a["grand_total"]);
 
         // ─── Top products ─────────────────────────────────────────────

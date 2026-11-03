@@ -124,13 +124,15 @@ class ApiProvider extends BaseModel
                     $this->currency = 'VND';
                 }
 
-                $requesterName = $payload['requester']['name'] ?? $data['requester']['name'] ?? null;
+                $requesterName = $payload['requester']['name'] ?? $data['requester']['name'] ?? $payload['dealer'] ?? $data['dealer'] ?? null;
                 $requesterChatId = $payload['requester']['chatId'] ?? $data['requester']['chatId'] ?? null;
 
                 if (!empty($payload['partner_id']) && empty($this->partner_id)) {
                     $this->partner_id = $payload['partner_id'];
                 } elseif (!empty($requesterChatId) && empty($this->partner_id)) {
                     $this->partner_id = 'tg_' . $requesterChatId;
+                } elseif (!empty($payload['dealer']) && empty($this->partner_id)) {
+                    $this->partner_id = 'dlr_' . \Illuminate\Support\Str::slug($payload['dealer']);
                 }
 
                 $this->last_sync_at = now();
@@ -184,6 +186,14 @@ class ApiProvider extends BaseModel
 
             if ($response->successful()) {
                 $data = $response->json();
+
+                // Cập nhật số dư nếu có trong response catalog (như Lay2FA /api/dealer/stock)
+                if (isset($data['balance'])) {
+                    $this->balance = (float) $data['balance'];
+                    $this->last_sync_at = now();
+                    $this->save();
+                }
+
                 $rawList = [];
                 if (is_array($data) && array_is_list($data)) {
                     $rawList = $data;
@@ -220,8 +230,8 @@ class ApiProvider extends BaseModel
                 $products = [];
                 foreach ($rawList as $p) {
                     if (!is_array($p)) continue;
-                    // Support product_id, productId, id, and name fallback
-                    $pId = (string)($p['product_id'] ?? $p['productId'] ?? $p['id'] ?? $p['name'] ?? '');
+                    // Support product_id, productId, product_key, id, and name fallback
+                    $pId = (string)($p['product_id'] ?? $p['productId'] ?? $p['product_key'] ?? $p['id'] ?? $p['name'] ?? '');
                     if (!$pId) continue;
 
                     // Support price as number or as object { amount: 12345, currency: 'VND' }
@@ -243,6 +253,9 @@ class ApiProvider extends BaseModel
                     } else {
                         $stock = (int)($p['stock_count'] ?? $p['stock'] ?? $p['quantity'] ?? 0);
                     }
+                    if ($stock < 0) {
+                        $stock = 0; // Tránh âm khi API trả về -1 (đang cập nhật)
+                    }
 
                     $sold = 0;
                     if (isset($p['availability']) && is_array($p['availability'])) {
@@ -256,7 +269,7 @@ class ApiProvider extends BaseModel
                         continue;
                     }
 
-                    $deliveryMode = $p['delivery_mode'] ?? ($p['productType'] ?? 'instant_items');
+                    $deliveryMode = $p['delivery_mode'] ?? ($p['productType'] ?? ($p['type'] ?? 'instant_items'));
 
                     $products[] = [
                         'product_id' => $pId,
@@ -306,9 +319,12 @@ class ApiProvider extends BaseModel
         $body = [
             'product_id' => $apiProductId,
             'product_name' => $apiProductId, // Supports MinhAIS which requires product_name
+            'product_key' => $apiProductId, // Supports Lay2FA CTV API which requires product_key
             'quantity' => $quantity,
+            'qty' => $quantity, // Supports Lay2FA CTV API which requires qty
             'partner_ref' => $partnerRef,
             'request_id' => $partnerRef,
+            'order_code' => $partnerRef, // Supports Lay2FA CTV API order_code
             'key' => trim($this->api_key), // Supports Canboso & standard APIs
         ];
 
@@ -335,7 +351,7 @@ class ApiProvider extends BaseModel
 
             if ($response->successful()) {
                 if (isset($json['success']) && $json['success'] === false) {
-                    $errorMessage = $json['detail'] ?? $json['message'] ?? $json['error'] ?? 'API error';
+                    $errorMessage = $json['error'] ?? $json['detail'] ?? $json['message'] ?? 'API error';
                     return [
                         'success' => false,
                         'status_code' => $response->status(),
@@ -344,7 +360,7 @@ class ApiProvider extends BaseModel
                     ];
                 }
                 if (isset($json['ok']) && $json['ok'] === false) {
-                    $errorMessage = $json['detail'] ?? $json['message'] ?? $json['error'] ?? 'API error';
+                    $errorMessage = $json['error'] ?? $json['detail'] ?? $json['message'] ?? 'API error';
                     return [
                         'success' => false,
                         'status_code' => $response->status(),
@@ -356,7 +372,7 @@ class ApiProvider extends BaseModel
                 $respData = $json['data'] ?? $json['order'] ?? $json;
                 $orderCode = $respData['order_code'] ?? $respData['orderCode'] ?? $json['order']['orderCode'] ?? $respData['order_id'] ?? $respData['id'] ?? $partnerRef;
 
-                // Delivery accounts from Canboso vs standard
+                // Delivery accounts from Canboso vs standard vs Lay2FA
                 $items = [];
                 if (!empty($json['delivery']['accounts'])) {
                     $items = $json['delivery']['accounts'];
@@ -369,7 +385,7 @@ class ApiProvider extends BaseModel
                 }
 
                 $status = $respData['status'] ?? $json['order']['status'] ?? 'done';
-                $balanceAfter = $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
+                $balanceAfter = $json['balance_remaining'] ?? $respData['balance_remaining'] ?? $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
 
                 if ($balanceAfter !== null) {
                     $this->balance = (float) $balanceAfter;
@@ -388,7 +404,7 @@ class ApiProvider extends BaseModel
                 ];
             }
 
-            $errorMessage = $json['detail'] ?? $json['message'] ?? $json['error'] ?? 'API error';
+            $errorMessage = $json['error'] ?? $json['detail'] ?? $json['message'] ?? 'API error';
             return [
                 'success' => false,
                 'status_code' => $response->status(),

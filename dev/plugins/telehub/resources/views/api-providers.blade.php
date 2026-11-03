@@ -1161,6 +1161,9 @@
                         <i class="ti ti-wand"></i> Chọn nhanh mẫu nhà cung cấp (Preset Provider)
                     </label>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="ap-btn ap-btn-sm ap-btn-primary btn-apply-provider-preset" data-preset="lay2fa" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none;">
+                            <i class="ti ti-key"></i> Lay2FA (@longdt8386_bot)
+                        </button>
                         <button type="button" class="ap-btn ap-btn-sm ap-btn-cyan btn-apply-provider-preset" data-preset="canboso">
                             <i class="ti ti-brand-telegram"></i> Canboso (@Vincentrrrrr_Bot)
                         </button>
@@ -1764,6 +1767,16 @@
 
     // Provider Presets
     const providerPresets = {
+        lay2fa: {
+            name: 'Lay2FA (@longdt8386_bot)',
+            base_url: 'https://api.lay2fa.xyz',
+            auth_type: 'header',
+            header_name: 'X-API-KEY',
+            partner_id: '',
+            endpoint_catalog: '/api/dealer/stock',
+            endpoint_orders: '/api/dealer/buy',
+            endpoint_balance: '/api/dealer/balance'
+        },
         canboso: {
             name: 'Canboso (@Vincentrrrrr_Bot)',
             base_url: 'https://canboso.com',

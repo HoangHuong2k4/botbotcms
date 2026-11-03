@@ -104,10 +104,14 @@ class ApiProvider extends BaseModel
 
                 if (isset($payload['balance'])) {
                     $this->balance = (float) $payload['balance'];
+                } elseif (isset($payload['credit'])) {
+                    $this->balance = (float) $payload['credit'];
                 } elseif (isset($payload['balanceVnd'])) {
                     $this->balance = (float) $payload['balanceVnd'];
                 } elseif (isset($data['balance'])) {
                     $this->balance = (float) $data['balance'];
+                } elseif (isset($data['credit'])) {
+                    $this->balance = (float) $data['credit'];
                 } elseif (isset($data['balanceVnd'])) {
                     $this->balance = (float) $data['balanceVnd'];
                 }
@@ -120,12 +124,14 @@ class ApiProvider extends BaseModel
                     $this->currency = $data['currency'];
                 } elseif (!empty($data['walletCurrency'])) {
                     $this->currency = $data['walletCurrency'];
+                } elseif (isset($payload['credit']) || isset($data['credit'])) {
+                    $this->currency = 'USD';
                 } else {
                     $this->currency = 'VND';
                 }
 
-                $requesterName = $payload['requester']['name'] ?? $data['requester']['name'] ?? $payload['dealer'] ?? $data['dealer'] ?? null;
-                $requesterChatId = $payload['requester']['chatId'] ?? $data['requester']['chatId'] ?? null;
+                $requesterName = $payload['requester']['name'] ?? $data['requester']['name'] ?? $payload['full_name'] ?? $payload['username'] ?? $payload['dealer'] ?? $data['dealer'] ?? null;
+                $requesterChatId = $payload['requester']['chatId'] ?? $data['requester']['chatId'] ?? $payload['user_id'] ?? $data['user_id'] ?? null;
 
                 if (!empty($payload['partner_id']) && empty($this->partner_id)) {
                     $this->partner_id = $payload['partner_id'];
@@ -187,9 +193,13 @@ class ApiProvider extends BaseModel
             if ($response->successful()) {
                 $data = $response->json();
 
-                // Cập nhật số dư nếu có trong response catalog (như Lay2FA /api/dealer/stock)
+                // Cập nhật số dư nếu có trong response catalog (như Lay2FA /api/dealer/stock hoặc Safe24 /api/profile)
                 if (isset($data['balance'])) {
                     $this->balance = (float) $data['balance'];
+                    $this->last_sync_at = now();
+                    $this->save();
+                } elseif (isset($data['credit'])) {
+                    $this->balance = (float) $data['credit'];
                     $this->last_sync_at = now();
                     $this->save();
                 }
@@ -225,6 +235,25 @@ class ApiProvider extends BaseModel
                     }
                 } elseif (isset($data['data']) && is_array($data['data']) && array_is_list($data['data'])) {
                     $rawList = $data['data'];
+                }
+
+                // Hỗ trợ API dạng đơn lẻ chuyên biệt (như Safe24 / Offer Pixel Bot chạy job qua /api/profile)
+                if (empty($rawList) && (isset($data['price']) || isset($data['credit']) || str_contains($this->base_url, 'apisafe24'))) {
+                    $unitPriceUsd = (float)($data['price'] ?? 1.2);
+                    $unitPriceVnd = (float)round($unitPriceUsd * 26000, -3);
+
+                    $rawList[] = [
+                        'product_id' => 'offer_pixel_google_one',
+                        'name' => 'Kích Hoạt Gói Google One 2TB (Pixel Offer)',
+                        'price' => $unitPriceVnd,
+                        'cost_price' => $unitPriceVnd,
+                        'price_usd' => $unitPriceUsd,
+                        'stock_count' => 999,
+                        'available' => true,
+                        'delivery_mode' => 'account_upgrade',
+                        'category' => 'Upgrade',
+                        'description' => "Dịch vụ kích hoạt gói Google One 2TB chính chủ chất lượng cao.\n📦 Định dạng gửi thông tin: Email | Mật khẩu | Mã 2FA TOTP (nếu có)\n⚡ Xử lý tự động nhanh chóng và bảo hành gói dịch vụ.",
+                    ];
                 }
 
                 $products = [];
@@ -333,6 +362,15 @@ class ApiProvider extends BaseModel
             $body['customer_email'] = $emails[0] ?? null;
         }
 
+        // Hỗ trợ API dạng Create Job chạy tài khoản (Safe24 / Google One / Offer Pixel)
+        if (str_contains($endpoint, 'jobs/create') || str_contains($this->base_url, 'apisafe24')) {
+            $credStr = $emails[0] ?? '';
+            $parts = explode('|', $credStr);
+            $body['email'] = trim($parts[0] ?? ($body['customer_email'] ?? ''));
+            $body['password'] = trim($parts[1] ?? '');
+            $body['totp_secret'] = trim($parts[2] ?? '');
+        }
+
         try {
             $headers = [
                 'Idempotency-Key' => $partnerRef,
@@ -370,11 +408,14 @@ class ApiProvider extends BaseModel
                 }
 
                 $respData = $json['data'] ?? $json['order'] ?? $json;
-                $orderCode = $respData['order_code'] ?? $respData['orderCode'] ?? $json['order']['orderCode'] ?? $respData['order_id'] ?? $respData['id'] ?? $partnerRef;
+                $orderCode = $respData['job_id'] ?? $json['job_id'] ?? $respData['order_code'] ?? $respData['orderCode'] ?? $json['order']['orderCode'] ?? $respData['order_id'] ?? $respData['id'] ?? $partnerRef;
 
-                // Delivery accounts from Canboso vs standard vs Lay2FA
+                // Delivery accounts from Canboso vs standard vs Lay2FA vs Safe24
                 $items = [];
-                if (!empty($json['delivery']['accounts'])) {
+                if (!empty($respData['job_id']) || !empty($json['job_id'])) {
+                    $jobId = $respData['job_id'] ?? $json['job_id'];
+                    $items = ["Tiến trình Safe24 (Job ID): {$jobId} | Xem trạng thái tại /api/jobs/status/{$jobId}"];
+                } elseif (!empty($json['delivery']['accounts'])) {
                     $items = $json['delivery']['accounts'];
                 } elseif (!empty($respData['delivery']['accounts'])) {
                     $items = $respData['delivery']['accounts'];
@@ -385,7 +426,7 @@ class ApiProvider extends BaseModel
                 }
 
                 $status = $respData['status'] ?? $json['order']['status'] ?? 'done';
-                $balanceAfter = $json['balance_remaining'] ?? $respData['balance_remaining'] ?? $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
+                $balanceAfter = $json['credit'] ?? $respData['credit'] ?? $json['balance_remaining'] ?? $respData['balance_remaining'] ?? $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
 
                 if ($balanceAfter !== null) {
                     $this->balance = (float) $balanceAfter;

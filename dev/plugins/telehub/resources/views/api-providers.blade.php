@@ -1161,6 +1161,9 @@
                         <i class="ti ti-wand"></i> Chọn nhanh mẫu nhà cung cấp (Preset Provider)
                     </label>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" class="ap-btn ap-btn-sm ap-btn-warning btn-apply-provider-preset" data-preset="apisafe24" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none;">
+                            <i class="ti ti-brand-google"></i> Offer Pixel (@offer_pixel_bot)
+                        </button>
                         <button type="button" class="ap-btn ap-btn-sm ap-btn-primary btn-apply-provider-preset" data-preset="lay2fa" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none;">
                             <i class="ti ti-key"></i> Lay2FA (@longdt8386_bot)
                         </button>
@@ -1767,6 +1770,16 @@
 
     // Provider Presets
     const providerPresets = {
+        apisafe24: {
+            name: 'Offer Pixel (@offer_pixel_bot)',
+            base_url: 'https://apisafe24.com',
+            auth_type: 'header',
+            header_name: 'x-api-key',
+            partner_id: '',
+            endpoint_catalog: '/api/profile',
+            endpoint_orders: '/api/jobs/create',
+            endpoint_balance: '/api/profile'
+        },
         lay2fa: {
             name: 'Lay2FA (@longdt8386_bot)',
             base_url: 'https://api.lay2fa.xyz',

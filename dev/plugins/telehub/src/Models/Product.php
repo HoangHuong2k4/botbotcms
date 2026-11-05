@@ -29,6 +29,8 @@ class Product extends BaseModel
         'description_en',
         'status',
         'is_api_product',
+        'is_unlimited',
+        'delivery_message',
         'api_provider_id',
         'api_product_id',
         'api_cost_price',
@@ -41,6 +43,7 @@ class Product extends BaseModel
     protected $casts = [
         'status' => BaseStatusEnum::class,
         'is_api_product' => 'boolean',
+        'is_unlimited' => 'boolean',
         'api_cost_price' => 'decimal:2',
         'api_stock' => 'integer',
         'api_sold' => 'integer',

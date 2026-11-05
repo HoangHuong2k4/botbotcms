@@ -67,6 +67,26 @@ class ProductTable extends TableAbstract
                         $product = $column->getItem();
                         $total = $product->items_count ?? 0;
                         $sold = $product->items_sold_count ?? 0;
+
+                        if ($product->is_unlimited) {
+                            $displaySold = max($sold, (int) ($product->api_sold ?? 0));
+                            $html = "<div class='text-center'>";
+                            $html .= "<strong class='text-success'>{$displaySold}</strong> / <strong class='text-info'>∞</strong>";
+                            $html .= "<div class='small text-info'>Vô hạn (Liên hệ Admin)</div>";
+                            $html .= "</div>";
+                            return $html;
+                        }
+
+                        if ($product->is_api_product) {
+                            $displaySold = max($sold, (int) ($product->api_sold ?? 0));
+                            $apiStock = (int) ($product->api_stock ?? 0);
+                            $html = "<div class='text-center'>";
+                            $html .= "<strong class='text-success'>{$displaySold}</strong> / <strong>API</strong>";
+                            $html .= "<div class='small text-primary'>Kho API: {$apiStock}</div>";
+                            $html .= "</div>";
+                            return $html;
+                        }
+
                         $available = $total - $sold;
                         
                         $html = "<div class='text-center'>";
@@ -100,6 +120,11 @@ class ProductTable extends TableAbstract
                     'icon',
                     'price',
                     'duration_days',
+                    'warranty_unit',
+                    'is_unlimited',
+                    'is_api_product',
+                    'api_stock',
+                    'api_sold',
                     'created_at',
                     'status',
                 ])->with(['tenant'])

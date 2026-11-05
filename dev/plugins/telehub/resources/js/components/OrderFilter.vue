@@ -73,15 +73,14 @@ export default defineComponent({
         })
 
         const columns = [
-            { title: 'ID Đơn', dataIndex: 'id', key: 'id', width: 80, sorter: true },
-            { title: 'Khách hàng', dataIndex: 'full_name', key: 'customer' },
-            { title: 'Mã đơn hàng', dataIndex: 'code', key: 'code', align: 'center' },
-            { title: 'Mã nạp (Cũ)', dataIndex: 'payment_code', key: 'payment_code', align: 'center' },
-            { title: 'Tổng tiền', dataIndex: 'total_amount', key: 'total_amount', align: 'right', sorter: true },
-            { title: 'Trạng thái', dataIndex: 'status', key: 'status', align: 'center', sorter: true },
-            { title: 'Loại Đơn', dataIndex: 'type', key: 'type', align: 'center', sorter: true },
-            { title: 'Thời gian', dataIndex: 'created_at', key: 'created_at', align: 'right', sorter: true },
-            { title: 'Thao tác', key: 'action', align: 'center', width: 190 }
+            { title: 'ID Đơn', dataIndex: 'id', key: 'id', width: 95, sorter: true },
+            { title: 'Khách hàng', dataIndex: 'full_name', key: 'customer', minWidth: 160 },
+            { title: 'Mã đơn hàng', dataIndex: 'code', key: 'code', align: 'center', width: 165 },
+            { title: 'Tổng tiền', dataIndex: 'total_amount', key: 'total_amount', align: 'right', width: 135, sorter: true },
+            { title: 'Trạng thái', dataIndex: 'status', key: 'status', align: 'center', width: 125, sorter: true },
+            { title: 'Loại Đơn', dataIndex: 'type', key: 'type', align: 'center', width: 120, sorter: true },
+            { title: 'Thời gian', dataIndex: 'created_at', key: 'created_at', align: 'right', width: 160, sorter: true },
+            { title: 'Thao tác', key: 'action', align: 'center', width: 230 }
         ]
 
         const innerColumns = [
@@ -161,35 +160,23 @@ export default defineComponent({
             return new Intl.NumberFormat('vi-VN').format(n || 0) + '₫'
         }
 
-        async function fetchStats(params) {
-            try {
-                // Fetch stats from the new stats endpoint
-                const statsUrl = props.apiUrl + '/stats?' + params.toString();
-                const resp = await fetch(statsUrl, {
-                    credentials: 'same-origin',
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                if (resp.ok) {
-                    const json = await resp.json();
-                    statistics.total_orders = json.total_orders || 0;
-                    statistics.total_revenue = json.total_revenue || 0;
-                    statistics.total_refunded_accs = json.total_refunded_accs || 0;
-                    statistics.total_refunded_amount = json.total_refunded_amount || 0;
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }
+        let activeAbortController = null
 
-        async function fetchData(page = 1) {
+        async function fetchData(page = 1, includeStats = true) {
+            if (activeAbortController) {
+                activeAbortController.abort()
+            }
+            const controller = new AbortController()
+            activeAbortController = controller
+
             loading.value = true
             try {
                 const params = new URLSearchParams()
                 params.set('page', page)
                 params.set('per_page', pagination.pageSize)
-                if (filter.code) params.set('search', filter.code)
-                if (filter.search) params.set('search', filter.search)
-                if (filter.email) params.set('email', filter.email)
+                if (filter.code && filter.code.trim()) params.set('code', filter.code.trim())
+                if (filter.search && filter.search.trim()) params.set('search', filter.search.trim())
+                if (filter.email && filter.email.trim()) params.set('email', filter.email.trim())
                 if (filter.type) params.set('type', filter.type)
                 if (filter.product_id) params.set('product_id', filter.product_id)
                 
@@ -203,25 +190,40 @@ export default defineComponent({
                     params.set('sort_dir', pagination.sortOrder === 'ascend' ? 'asc' : 'desc')
                 }
 
-                // Call both API and stats
-                const respPromise = fetch(props.apiUrl + '?' + params.toString(), {
-                    credentials: 'same-origin',
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                
-                fetchStats(params);
+                if (includeStats) {
+                    params.set('with_stats', '1')
+                }
 
-                const resp = await respPromise;
+                const resp = await fetch(props.apiUrl + '?' + params.toString(), {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    signal: controller.signal
+                })
                 
-                if (!resp.ok) return;
+                if (!resp.ok) return
 
                 const json = await resp.json()
                 orders.value = json.data || []
                 pagination.current = json.current_page
                 pagination.pageSize = json.per_page
                 pagination.total = json.total
+
+                if (json.statistics) {
+                    statistics.total_orders = json.statistics.total_orders || 0
+                    statistics.total_revenue = json.statistics.total_revenue || 0
+                    statistics.total_refunded_accs = json.statistics.total_refunded_accs || 0
+                    statistics.total_refunded_amount = json.statistics.total_refunded_amount || 0
+                } else {
+                    statistics.total_orders = json.total || 0
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error(err)
+                }
             } finally {
-                loading.value = false
+                if (activeAbortController === controller) {
+                    loading.value = false
+                }
             }
         }
 
@@ -266,11 +268,12 @@ export default defineComponent({
                 pagination.sortField = null;
                 pagination.sortOrder = null;
             }
-            fetchData(pag.current)
+            fetchData(pag.current, false)
         }
 
         function applyFilter() {
-            fetchData(1)
+            pagination.current = 1
+            fetchData(1, true)
         }
 
         function checkWarranty(order, itemRecord) {
@@ -501,28 +504,28 @@ export default defineComponent({
             </div>
             
             <a-row :gutter="[16, 16]">
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Mã đơn hàng (Order Code)</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Mã đơn hàng (Order Code)</div>
                     <a-input 
                         v-model:value="filter.code" 
-                        placeholder="Nhập mã đơn hàng..." 
+                        placeholder="Nhập mã đơn hàng hoặc Job ID..." 
                         allow-clear
                         @pressEnter="applyFilter"
                     />
                 </a-col>
                 
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Tìm kiếm khách hàng (Tên / ID)</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Tìm kiếm khách hàng (Tên / ID)</div>
                     <a-input 
                         v-model:value="filter.search" 
-                        placeholder="Nhập Tên, Telegram ID hoặc ID đơn hàng..." 
+                        placeholder="Nhập Tên, @username, Telegram ID hoặc ID đơn..." 
                         allow-clear
                         @pressEnter="applyFilter"
                     />
                 </a-col>
 
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Email / Tài khoản đã mua</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Email / Tài khoản đã mua</div>
                     <a-input 
                         v-model:value="filter.email" 
                         placeholder="Nhập email hoặc tài khoản để tìm..." 
@@ -531,8 +534,8 @@ export default defineComponent({
                     />
                 </a-col>
                 
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Lọc theo Thời gian</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Lọc theo Thời gian</div>
                     <a-range-picker 
                         v-model:value="filter.dateRange" 
                         value-format="YYYY-MM-DD"
@@ -541,8 +544,8 @@ export default defineComponent({
                     />
                 </a-col>
                 
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Loại đơn hàng</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Loại đơn hàng</div>
                     <a-select v-model:value="filter.type" style="width: 100%" placeholder="Tất cả" allow-clear @change="applyFilter">
                         <a-select-option value="">Tất cả</a-select-option>
                         <a-select-option value="sale">Đơn mua hàng (Sale)</a-select-option>
@@ -551,8 +554,8 @@ export default defineComponent({
                     </a-select>
                 </a-col>
 
-                <a-col :xs="24" :md="4">
-                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px;">Lọc theo Sản phẩm</div>
+                <a-col :xs="24" :sm="12" :lg="8">
+                    <div style="color:#bfdbfe; font-size:12px; font-weight:600; margin-bottom:6px; white-space: nowrap;">Lọc theo Sản phẩm</div>
                     <a-select
                         v-model:value="filter.product_id"
                         style="width: 100%"
@@ -603,41 +606,41 @@ export default defineComponent({
 
         <a-card title="Danh sách đơn hàng" style="border-radius: 12px;" :bodyStyle="{padding: 0}">
             <a-table 
+                class="orders-main-table"
                 :dataSource="orders" 
                 :columns="columns" 
                 :pagination="pagination"
                 :loading="loading"
+                :scroll="{ x: 1050 }"
                 @change="handleTableChange"
                 rowKey="id"
                 expandRowByClick
             >
                 <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'id'">
-                        #{{ record.id }}
+                        <span style="white-space: nowrap; font-weight: 600;">#{{ record.id }}</span>
                     </template>
                     <template v-if="column.key === 'customer'">
-                        <div style="font-weight:700;">{{ record.full_name || 'Khách' }}</div>
-                        <div style="font-size:12px; opacity:0.6;"><i class="ti ti-brand-telegram"></i> {{ record.telegram_id }}</div>
+                        <div style="font-weight:700; white-space: nowrap;">{{ record.full_name || 'Khách' }}</div>
+                        <div style="font-size:12px; opacity:0.6; white-space: nowrap;"><i class="ti ti-brand-telegram"></i> {{ record.telegram_id }}</div>
                     </template>
                     <template v-if="column.key === 'code'">
-                        <span style="font-family: monospace; font-weight: bold; color: #facc15;">{{ record.code || '-' }}</span>
-                    </template>
-                    <template v-if="column.key === 'payment_code'">
-                        <span style="font-family: monospace; font-size: 11px; color: #94a3b8;">{{ record.payment_code || '-' }}</span>
+                        <div style="font-family: monospace; font-weight: bold; color: #facc15; white-space: nowrap;">{{ record.code || '-' }}</div>
+                        <div v-if="record.payment_code" style="font-family: monospace; font-size: 11px; color: #94a3b8; white-space: nowrap; margin-top: 2px;">({{ record.payment_code }})</div>
                     </template>
                     <template v-if="column.key === 'total_amount'">
-                        <div v-if="record.refunded_amount > 0">
+                        <div v-if="record.refunded_amount > 0" style="white-space: nowrap;">
                             <span style="text-decoration: line-through; color: #64748b; font-size: 12px; margin-right: 4px;">{{ fmt(record.total_amount) }}</span>
                             <span style="color: #10b981; font-weight: 600;">{{ fmt(record.total_amount - record.refunded_amount) }}</span>
                             <div style="font-size: 11px; color: #ef4444; margin-top: 2px;">
                                 <i class="ti ti-arrow-back-up"></i> Đã hoàn {{ fmt(record.refunded_amount) }}
                             </div>
                         </div>
-                        <span v-else style="color: #10b981; font-weight: 600;">{{ fmt(record.total_amount) }}</span>
+                        <span v-else style="color: #10b981; font-weight: 600; white-space: nowrap;">{{ fmt(record.total_amount) }}</span>
                     </template>
                     <template v-if="column.key === 'status'">
-                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                            <a-tag :color="record.status === 'completed' ? 'success' : 'default'">{{ record.status }}</a-tag>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px; white-space: nowrap;">
+                            <a-tag :color="record.status === 'completed' ? 'success' : 'default'" style="margin: 0;">{{ record.status }}</a-tag>
                             <a-tag 
                                 v-if="record.api_provider_id || record.api_order_code || record.api_status" 
                                 :color="getApiStatusColor(record.api_status)"
@@ -648,15 +651,15 @@ export default defineComponent({
                         </div>
                     </template>
                     <template v-if="column.key === 'type'">
-                        <a-tag v-if="record.type === 'warranty'" color="error">Bảo hành / Lỗi</a-tag>
-                        <a-tag v-else-if="record.type === 'login'" color="purple">Login (CK tay)</a-tag>
-                        <a-tag v-else color="blue">Bán ra</a-tag>
+                        <a-tag v-if="record.type === 'warranty'" color="error" style="margin: 0;">Bảo hành / Lỗi</a-tag>
+                        <a-tag v-else-if="record.type === 'login'" color="purple" style="margin: 0;">Login (CK tay)</a-tag>
+                        <a-tag v-else color="blue" style="margin: 0;">Bán ra</a-tag>
                     </template>
                     <template v-if="column.key === 'created_at'">
-                        {{ formatDate(record.created_at) }}
+                        <span style="white-space: nowrap; font-size: 13px;">{{ formatDate(record.created_at) }}</span>
                     </template>
                     <template v-if="column.key === 'action'">
-                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: nowrap; white-space: nowrap;">
                             <a-button 
                                 v-if="record.api_order_code || record.api_provider_id"
                                 type="dashed" 
@@ -666,7 +669,7 @@ export default defineComponent({
                                 title="Kiểm tra trực tiếp kết quả API"
                                 style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4);"
                             >
-                                <i class="ti ti-refresh"></i> Check API
+                                <i class="ti ti-refresh"></i> API
                             </a-button>
 
                             <a-button type="primary" ghost size="small" @click.stop="openEditPriceModal(record)" title="Chỉnh sửa giá đơn hàng">
@@ -674,7 +677,7 @@ export default defineComponent({
                             </a-button>
 
                             <a-dropdown :trigger="['click']">
-                                <a-button type="dashed" size="small">
+                                <a-button type="dashed" size="small" @click.stop>
                                     Đổi Loại <i class="ti ti-chevron-down ms-1"></i>
                                 </a-button>
                                 <template #overlay>
@@ -948,3 +951,9 @@ export default defineComponent({
     </div>
 </a-config-provider>
 </template>
+
+<style scoped>
+.orders-main-table :deep(.ant-table-thead > tr > th) {
+    white-space: nowrap;
+}
+</style>

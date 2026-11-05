@@ -5,6 +5,7 @@ namespace Dev\Telehub\Forms;
 use Dev\Base\Forms\FieldOptions\NameFieldOption;
 use Dev\Base\Forms\FieldOptions\StatusFieldOption;
 use Dev\Base\Forms\Fields\NumberField;
+use Dev\Base\Forms\Fields\OnOffField;
 use Dev\Base\Forms\Fields\SelectField;
 use Dev\Base\Forms\Fields\TextField;
 use Dev\Base\Forms\Fields\TextareaField;
@@ -88,6 +89,25 @@ class ProductForm extends FormAbstract
                 'label' => 'Description (English)',
                 'attr' => [
                     'rows' => 4,
+                ],
+            ])
+            ->add('is_unlimited', OnOffField::class, [
+                'label' => '♾️ Vô hạn số lượng (Trả kịch bản / Liên hệ Admin)',
+                'value' => (bool) ($this->getModel()->is_unlimited ?? false),
+                'help_block' => [
+                    'text' => 'Bật tuỳ chọn này nếu sản phẩm không cần thêm từng item vào kho (ví dụ: thanh toán xong liên hệ Admin để thêm vào nhóm hoặc nhận sản phẩm). Số lượng tồn kho sẽ là Vô hạn.',
+                ],
+            ])
+            ->add('delivery_message', TextareaField::class, [
+                'label' => '📩 Kịch bản trả về sau khi thanh toán (Dành cho loại Vô hạn)',
+                'required' => false,
+                'value' => $this->getModel()->delivery_message,
+                'attr' => [
+                    'rows' => 3,
+                    'placeholder' => 'Liên hệ admin để được hỗ trợ sản phẩm',
+                ],
+                'help_block' => [
+                    'text' => 'Nội dung tự động trả về cho khách khi thanh toán xong (chỉ áp dụng khi bật Vô hạn số lượng). Nếu để trống, mặc định sẽ trả về: "Liên hệ admin để được hỗ trợ sản phẩm".',
                 ],
             ])
             ->add('api_sold', NumberField::class, [

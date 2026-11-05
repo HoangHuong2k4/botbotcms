@@ -12,5 +12,5 @@
 @endsection
 
 @push('footer')
-<script src="{{ asset('vendor/core/plugins/telehub/js/statistics.js') }}"></script>
+<script src="{{ asset('vendor/core/plugins/telehub/js/statistics.js') }}?v={{ @filemtime(public_path('vendor/core/plugins/telehub/js/statistics.js')) ?: time() }}"></script>
 @endpush

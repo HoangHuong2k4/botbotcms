@@ -20,6 +20,8 @@ class ProductRequest extends Request
             'price_usd' => 'nullable|numeric|min:0',
             'description' => 'nullable|string|max:1000',
             'description_en' => 'nullable|string|max:1000',
+            'is_unlimited' => 'nullable|boolean',
+            'delivery_message' => 'nullable|string|max:2000',
             'status' => Rule::in(BaseStatusEnum::values()),
         ];
     }

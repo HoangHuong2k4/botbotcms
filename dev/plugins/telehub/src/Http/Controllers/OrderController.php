@@ -27,67 +27,158 @@ class OrderController extends BaseController
         return view('plugins/telehub::orders', compact('isAdmin', 'paymentCode'));
     }
 
-    private function buildOrderQuery(Request $request, $isAdmin)
+    private function buildOrderFilterQuery(Request $request, $isAdmin)
     {
-        $paymentCode = $request->input('payment_code');
-        $search = $request->input('search');
-        $email = $request->input('email');
+        $paymentCode = trim((string) $request->input('payment_code', ''));
+        $code = trim((string) $request->input('code', ''));
+        $search = trim((string) $request->input('search', ''));
+        $email = trim((string) $request->input('email', ''));
 
-        $query = Order::from('telehub_orders')
-            ->select('telehub_orders.*', 'c.full_name', 'c.telegram_id')
-            ->leftJoin('telehub_api_providers as ap', 'ap.id', '=', 'telehub_orders.api_provider_id')
-            ->addSelect('ap.name as api_provider_name')
-            ->addSelect(DB::raw('(SELECT payment_code FROM telehub_deposit_requests dr WHERE dr.customer_id = telehub_orders.customer_id ORDER BY dr.id DESC LIMIT 1) as payment_code'))
-            ->addSelect(DB::raw('(SELECT IFNULL(SUM(refund_amount), 0) FROM telehub_warranties w WHERE w.order_id = telehub_orders.id AND w.type = "refund") as refunded_amount'))
-            ->join('telehub_bot_customers as c', 'c.id', '=', 'telehub_orders.customer_id')
-            ->with(['details' => function($q) {
-                $q->join('telehub_products as p', 'p.id', '=', 'telehub_order_details.product_id')
-                  ->select('telehub_order_details.*', 'p.name as product_name', 'p.duration_days');
-            }, 'items']);
+        $query = Order::from('telehub_orders');
 
+        $tenantId = null;
         if (!$isAdmin) {
             if ($tenant = Tenant::current()) {
-                $query->where('telehub_orders.tenant_id', $tenant->id);
+                $tenantId = $tenant->id;
+                $query->where('telehub_orders.tenant_id', $tenantId);
             }
         }
 
-        if ($paymentCode) {
-            $deposit = DepositRequest::where('payment_code', $paymentCode)->first();
-            if ($deposit) {
-                $query->where('telehub_orders.customer_id', $deposit->customer_id);
+        if ($paymentCode !== '') {
+            $depQuery = DepositRequest::where('payment_code', $paymentCode);
+            if ($tenantId) {
+                $depQuery->where('tenant_id', $tenantId);
+            }
+            $depCustomerIds = $depQuery->pluck('customer_id')->unique()->toArray();
+            if (!empty($depCustomerIds)) {
+                $query->whereIn('telehub_orders.customer_id', $depCustomerIds);
             } else {
-                // If payment code not found, make it return empty
-                $query->where('telehub_orders.id', -1);
+                $query->where('telehub_orders.code', $paymentCode);
             }
         }
 
-        if ($email) {
-            $query->whereHas('items', function ($q) use ($email) {
-                $q->where('username', 'like', "%{$email}%")
-                  ->orWhere('note', 'like', "%{$email}%")
-                  ->orWhere('content', 'like', "%{$email}%");
-            });
+        if ($code !== '') {
+            $cleanCode = ltrim($code, '#');
+            $directQuery = DB::table('telehub_orders')
+                ->where(function ($q) use ($cleanCode) {
+                    $q->where('code', 'like', "%{$cleanCode}%")
+                      ->orWhere('api_order_code', 'like', "%{$cleanCode}%");
+                    if (ctype_digit($cleanCode)) {
+                        $q->orWhere('id', (int) $cleanCode);
+                    }
+                });
+            if ($tenantId) {
+                $directQuery->where('tenant_id', $tenantId);
+            }
+
+            if ($directQuery->exists()) {
+                $query->where(function ($q) use ($cleanCode) {
+                    $q->where('telehub_orders.code', 'like', "%{$cleanCode}%")
+                      ->orWhere('telehub_orders.api_order_code', 'like', "%{$cleanCode}%");
+                    if (ctype_digit($cleanCode)) {
+                        $q->orWhere('telehub_orders.id', (int) $cleanCode);
+                    }
+                });
+            } else {
+                $depQuery = DB::table('telehub_deposit_requests')
+                    ->where('payment_code', 'like', "%{$cleanCode}%");
+                if ($tenantId) {
+                    $depQuery->where('tenant_id', $tenantId);
+                }
+                $depCustomerIds = $depQuery->pluck('customer_id')->unique()->toArray();
+
+                if (!empty($depCustomerIds)) {
+                    $query->whereIn('telehub_orders.customer_id', $depCustomerIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
         }
 
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('c.full_name', 'like', "%{$search}%")
-                  ->orWhere('c.telegram_id', 'like', "%{$search}%")
-                  ->orWhere('telehub_orders.code', 'like', "%{$search}%")
-                  ->orWhere('telehub_orders.id', $search)
-                  ->orWhereRaw('(SELECT payment_code FROM telehub_deposit_requests dr WHERE dr.customer_id = telehub_orders.customer_id ORDER BY dr.id DESC LIMIT 1) LIKE ?', ["%{$search}%"]);
+        if ($email !== '') {
+            $itemsQuery = DB::table('telehub_product_items')
+                ->whereNotNull('order_id')
+                ->where(function ($q) use ($email) {
+                    $q->where('username', 'like', "%{$email}%")
+                      ->orWhere('note', 'like', "%{$email}%")
+                      ->orWhere('content', 'like', "%{$email}%");
+                });
+            if ($tenantId) {
+                $itemsQuery->where('tenant_id', $tenantId);
+            }
+            $itemOrderIds = $itemsQuery->pluck('order_id')->unique()->toArray();
+
+            $depCredQuery = DB::table('telehub_deposit_requests')
+                ->where('credentials', 'like', "%{$email}%");
+            if ($tenantId) {
+                $depCredQuery->where('tenant_id', $tenantId);
+            }
+            $credCodes = $depCredQuery->pluck('payment_code')->unique()->toArray();
+
+            if (empty($itemOrderIds) && empty($credCodes)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where(function ($q) use ($itemOrderIds, $credCodes) {
+                    if (!empty($itemOrderIds)) {
+                        $q->whereIn('telehub_orders.id', $itemOrderIds);
+                    }
+                    if (!empty($credCodes)) {
+                        $q->orWhereIn('telehub_orders.code', $credCodes);
+                    }
+                });
+            }
+        }
+
+        if ($search !== '') {
+            $cleanSearch = ltrim($search, '@#');
+            $custQuery = DB::table('telehub_bot_customers')
+                ->where(function ($q) use ($search, $cleanSearch) {
+                    $q->where('full_name', 'like', "%{$search}%")
+                      ->orWhere('telegram_id', 'like', "%{$cleanSearch}%")
+                      ->orWhere('username', 'like', "%{$cleanSearch}%");
+                });
+            if ($tenantId) {
+                $custQuery->where('tenant_id', $tenantId);
+            }
+            $matchedCustomerIds = $custQuery->pluck('id')->toArray();
+
+            $depQuery = DB::table('telehub_deposit_requests')
+                ->where('payment_code', 'like', "%{$cleanSearch}%");
+            if ($tenantId) {
+                $depQuery->where('tenant_id', $tenantId);
+            }
+            $depCustomerIds = $depQuery->pluck('customer_id')->toArray();
+
+            $allCustomerIds = array_values(array_unique(array_merge($matchedCustomerIds, $depCustomerIds)));
+
+            $query->where(function ($q) use ($cleanSearch, $allCustomerIds) {
+                $q->where('telehub_orders.code', 'like', "%{$cleanSearch}%")
+                  ->orWhere('telehub_orders.api_order_code', 'like', "%{$cleanSearch}%");
+                if (ctype_digit($cleanSearch)) {
+                    $q->orWhere('telehub_orders.id', (int) $cleanSearch);
+                }
+                if (!empty($allCustomerIds)) {
+                    $q->orWhereIn('telehub_orders.customer_id', $allCustomerIds);
+                }
             });
         }
 
         if ($request->filled('type')) {
-            $query->where('telehub_orders.type', $request->type);
+            $query->where('telehub_orders.type', $request->input('type'));
         }
 
         if ($request->filled('product_id')) {
             $productId = (int) $request->input('product_id');
-            $query->whereHas('details', function ($q) use ($productId) {
-                $q->where('telehub_order_details.product_id', $productId);
-            });
+            $orderIdsByProduct = DB::table('telehub_order_details')
+                ->where('product_id', $productId)
+                ->pluck('order_id')
+                ->unique()
+                ->toArray();
+            if (empty($orderIdsByProduct)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('telehub_orders.id', $orderIdsByProduct);
+            }
         }
 
         $dateFrom = $request->input('date_from');
@@ -102,27 +193,95 @@ class OrderController extends BaseController
         return $query;
     }
 
+    private function computeStatistics($baseQuery): array
+    {
+        $orderAgg = (clone $baseQuery)
+            ->selectRaw('
+                COUNT(*) as total_orders,
+                IFNULL(SUM(CASE WHEN telehub_orders.status = "completed" AND telehub_orders.type != "warranty" AND telehub_orders.created_at IS NOT NULL THEN telehub_orders.total_amount ELSE 0 END), 0) as gross_revenue
+            ')
+            ->first();
+
+        $totalOrders = (int) ($orderAgg->total_orders ?? 0);
+        $grossRevenue = (float) ($orderAgg->gross_revenue ?? 0);
+
+        $stats = (clone $baseQuery)
+            ->where('telehub_orders.status', 'completed')
+            ->where('telehub_orders.type', '!=', 'warranty')
+            ->whereNotNull('telehub_orders.created_at')
+            ->join('telehub_warranties as w', 'w.order_id', '=', 'telehub_orders.id')
+            ->where('w.type', 'refund')
+            ->selectRaw('COUNT(w.id) as total_accs, IFNULL(SUM(w.refund_amount), 0) as total_amount')
+            ->first();
+
+        $refundedAccs = (int) ($stats->total_accs ?? 0);
+        $refundedAmount = (float) ($stats->total_amount ?? 0);
+
+        return [
+            'total_orders' => $totalOrders,
+            'total_revenue' => $grossRevenue - $refundedAmount,
+            'total_refunded_accs' => $refundedAccs,
+            'total_refunded_amount' => $refundedAmount,
+        ];
+    }
+
     public function api(Request $request)
     {
         $user = Auth::user();
         $isAdmin = $user->isSuperUser();
 
-        $query = $this->buildOrderQuery($request, $isAdmin);
-        
+        $baseQuery = $this->buildOrderFilterQuery($request, $isAdmin);
+
         $sortBy = $request->input('sort_by');
-        $sortDir = $request->input('sort_dir', 'desc');
-        
+        $sortDir = strtolower((string) $request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
         $validSortFields = ['id', 'total_amount', 'created_at', 'status', 'type'];
-        if ($sortBy && in_array($sortBy, $validSortFields)) {
-            $query->orderBy('telehub_orders.' . $sortBy, $sortDir);
+        $sortField = ($sortBy && in_array($sortBy, $validSortFields, true)) ? $sortBy : 'id';
+
+        $perPage = min(max((int) $request->input('per_page', 20), 1), 200);
+        $page = max((int) $request->input('page', 1), 1);
+
+        $withStats = $request->boolean('with_stats');
+        $statistics = null;
+
+        if ($withStats) {
+            $statistics = $this->computeStatistics($baseQuery);
+            $total = $statistics['total_orders'];
         } else {
-            $query->orderBy('telehub_orders.id', 'desc');
+            $total = (int) (clone $baseQuery)->count();
         }
 
-        $perPage = $request->input('per_page', 20);
-        $orders = $query->paginate($perPage);
+        $items = [];
+        if ($total > 0) {
+            $items = (clone $baseQuery)
+                ->join('telehub_bot_customers as c', 'c.id', '=', 'telehub_orders.customer_id')
+                ->select('telehub_orders.*', 'c.full_name', 'c.telegram_id')
+                ->addSelect(DB::raw('(SELECT name FROM telehub_api_providers ap WHERE ap.id = telehub_orders.api_provider_id LIMIT 1) as api_provider_name'))
+                ->addSelect(DB::raw('(SELECT payment_code FROM telehub_deposit_requests dr WHERE dr.customer_id = telehub_orders.customer_id ORDER BY dr.id DESC LIMIT 1) as payment_code'))
+                ->addSelect(DB::raw('(SELECT IFNULL(SUM(refund_amount), 0) FROM telehub_warranties w WHERE w.order_id = telehub_orders.id AND w.type = "refund") as refunded_amount'))
+                ->with(['details' => function ($q) {
+                    $q->join('telehub_products as p', 'p.id', '=', 'telehub_order_details.product_id')
+                      ->select('telehub_order_details.*', 'p.name as product_name', 'p.duration_days');
+                }, 'items'])
+                ->orderBy('telehub_orders.' . $sortField, $sortDir)
+                ->forPage($page, $perPage)
+                ->get();
+        }
 
-        return response()->json($orders);
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        $response = $paginator->toArray();
+        if ($statistics !== null) {
+            $response['statistics'] = $statistics;
+        }
+
+        return response()->json($response);
     }
 
     public function apiStats(Request $request)
@@ -130,36 +289,9 @@ class OrderController extends BaseController
         $user = Auth::user();
         $isAdmin = $user->isSuperUser();
 
-        $query = $this->buildOrderQuery($request, $isAdmin);
+        $baseQuery = $this->buildOrderFilterQuery($request, $isAdmin);
 
-        // Compute overall statistics for the current filter
-        $totalOrders = (clone $query)->count();
-
-        // Revenue must follow the same rules as StatisticsController so both screens match:
-        // only completed sale orders (exclude cancelled + warranty) and ignore legacy/test
-        // rows without created_at. No data is modified — rows are only filtered out.
-        $revenueQuery = (clone $query)
-            ->where('telehub_orders.status', 'completed')
-            ->where('telehub_orders.type', '!=', 'warranty')
-            ->whereNotNull('telehub_orders.created_at');
-
-        $grossRevenue = (clone $revenueQuery)->sum('telehub_orders.total_amount');
-
-        $stats = DB::table('telehub_warranties')
-            ->joinSub((clone $revenueQuery)->select('telehub_orders.id'), 'filtered_orders', 'filtered_orders.id', '=', 'telehub_warranties.order_id')
-            ->where('telehub_warranties.type', 'refund')
-            ->selectRaw('COUNT(*) as total_accs, SUM(refund_amount) as total_amount')
-            ->first();
-
-        $refundedAccs = $stats->total_accs ?? 0;
-        $refundedAmount = $stats->total_amount ?? 0;
-
-        return response()->json([
-            'total_orders' => $totalOrders,
-            'total_revenue' => $grossRevenue - $refundedAmount,
-            'total_refunded_accs' => $refundedAccs,
-            'total_refunded_amount' => $refundedAmount
-        ]);
+        return response()->json($this->computeStatistics($baseQuery));
     }
 
     public function apiProducts(Request $request)

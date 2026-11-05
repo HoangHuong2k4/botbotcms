@@ -35,6 +35,8 @@ class OrderController extends BaseController
 
         $query = Order::from('telehub_orders')
             ->select('telehub_orders.*', 'c.full_name', 'c.telegram_id')
+            ->leftJoin('telehub_api_providers as ap', 'ap.id', '=', 'telehub_orders.api_provider_id')
+            ->addSelect('ap.name as api_provider_name')
             ->addSelect(DB::raw('(SELECT payment_code FROM telehub_deposit_requests dr WHERE dr.customer_id = telehub_orders.customer_id ORDER BY dr.id DESC LIMIT 1) as payment_code'))
             ->addSelect(DB::raw('(SELECT IFNULL(SUM(refund_amount), 0) FROM telehub_warranties w WHERE w.order_id = telehub_orders.id AND w.type = "refund") as refunded_amount'))
             ->join('telehub_bot_customers as c', 'c.id', '=', 'telehub_orders.customer_id')
@@ -409,6 +411,114 @@ class OrderController extends BaseController
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => true, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()]);
+        }
+    }
+
+    public function checkApiStatus($id)
+    {
+        $order = Order::findOrFail($id);
+
+        $user = Auth::user();
+        $isAdmin = $user->isSuperUser();
+        if (!$isAdmin) {
+            if ($tenant = Tenant::current()) {
+                if ($order->tenant_id != $tenant->id) {
+                    abort(403);
+                }
+            }
+        }
+
+        if (!$order->api_provider_id || !$order->api_order_code) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Đơn hàng này không có mã Job ID kết nối API.'
+            ], 400);
+        }
+
+        $provider = DB::table('telehub_api_providers')->where('id', $order->api_provider_id)->first();
+        if (!$provider || empty($provider->base_url)) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Không tìm thấy thông tin nhà cung cấp API.'
+            ], 400);
+        }
+
+        $baseUrl = rtrim($provider->base_url, '/');
+        $authHeader = $provider->header_name ?: 'x-api-key';
+        $headers = [
+            'Accept' => 'application/json',
+        ];
+        if ($provider->auth_type === 'bearer') {
+            $headers['Authorization'] = 'Bearer ' . $provider->api_key;
+        } else {
+            $headers[$authHeader] = $provider->api_key;
+        }
+
+        try {
+            $statusUrl = "{$baseUrl}/api/jobs/status/" . urlencode($order->api_order_code);
+            $response = \Illuminate\Support\Facades\Http::withHeaders($headers)
+                ->timeout(15)
+                ->get($statusUrl);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $newStatus = strtolower($data['status'] ?? '');
+
+                if ($newStatus) {
+                    $order->api_status = $newStatus;
+                    $order->api_response = json_encode($data);
+                    $order->save();
+
+                    // Cập nhật nội dung trong telehub_product_items nếu completed hoặc failed
+                    if ($newStatus === 'completed' || $newStatus === 'failed') {
+                        $note = $data['note'] ?? '';
+                        $progress = $data['progress'] ?? null;
+                        $resultLink = $data['result_link'] ?? '';
+
+                        $dep = DB::table('telehub_deposit_requests')->where('payment_code', $order->code)->first();
+                        $email = '';
+                        if ($dep && !empty($dep->credentials)) {
+                            $parts = explode('|', $dep->credentials);
+                            $email = trim($parts[0] ?? '');
+                        }
+
+                        if ($newStatus === 'completed') {
+                            $content = "🎉 NÂNG CẤP TÀI KHOẢN THÀNH CÔNG!\n"
+                                . ($email ? "📧 Tài khoản: {$email}\n" : "")
+                                . "🆔 Job ID: {$order->api_order_code}\n"
+                                . ($resultLink ? "🎁 Kết quả: {$resultLink}\n" : "")
+                                . ($note ? "📝 Ghi chú: {$note}\n" : "");
+                        } else {
+                            $content = "⚠️ KÍCH HOẠT KHÔNG THÀNH CÔNG\n"
+                                . ($email ? "📧 Tài khoản: {$email}\n" : "")
+                                . "🆔 Job ID: {$order->api_order_code}\n"
+                                . "❌ Lý do: " . ($note ?: 'Lỗi xử lý') . "\n"
+                                . ($progress !== null ? "📊 Tiến trình dừng ở: {$progress}%\n" : "");
+                        }
+
+                        DB::table('telehub_product_items')->where('order_id', $order->id)->update([
+                            'content' => $content
+                        ]);
+                    }
+                }
+
+                return response()->json([
+                    'error' => false,
+                    'message' => 'Cập nhật trạng thái API thành công: ' . strtoupper($newStatus),
+                    'data' => $data,
+                    'order' => $order
+                ]);
+            } else {
+                return response()->json([
+                    'error' => true,
+                    'message' => 'API nhà cung cấp phản hồi lỗi: ' . $response->status()
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Lỗi kết nối tới API: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

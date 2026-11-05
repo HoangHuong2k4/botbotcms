@@ -92,11 +92,70 @@ export default defineComponent({
         ]
 
         const itemColumns = [
-            { title: 'Tài khoản', dataIndex: 'username', key: 'username' },
-            { title: 'Mật khẩu', dataIndex: 'password', key: 'password' },
-            { title: 'Ghi chú / Status', key: 'note_status' },
+            { title: 'Tài khoản / Chi tiết giao hàng', dataIndex: 'username', key: 'username' },
+            { title: 'Mật khẩu', dataIndex: 'password', key: 'password', width: 180 },
+            { title: 'Ghi chú / Status', key: 'note_status', width: 180 },
             { title: 'Thao tác', key: 'item_action', align: 'center', width: 100 }
         ]
+
+        const checkingApiId = ref(null)
+
+        function getApiStatusColor(status) {
+            if (!status) return 'default'
+            const s = String(status).toLowerCase()
+            if (['completed', 'success', 'done'].includes(s)) return 'success'
+            if (['processing', 'running', 'in_progress'].includes(s)) return 'processing'
+            if (['queued', 'pending', 'waiting'].includes(s)) return 'warning'
+            if (['failed', 'error', 'cancelled'].includes(s)) return 'error'
+            return 'default'
+        }
+
+        function formatApiResponse(raw) {
+            if (!raw) return ''
+            if (typeof raw === 'object') {
+                return JSON.stringify(raw, null, 2)
+            }
+            try {
+                const parsed = JSON.parse(raw)
+                return JSON.stringify(parsed, null, 2)
+            } catch (e) {
+                return String(raw)
+            }
+        }
+
+        async function checkApiStatus(record) {
+            checkingApiId.value = record.id
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            const hide = message.loading(`Đang kiểm tra API đơn #${record.code || record.id}...`, 0)
+            try {
+                const resp = await fetch(`${props.updateUrlPrefix}/${record.id}/check-api`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                const data = await resp.json()
+                if (resp.ok && !data.error) {
+                    message.success(data.message || 'Cập nhật trạng thái API thành công')
+                    if (data.order) {
+                        record.api_status = data.order.api_status
+                        record.api_response = data.order.api_response
+                        record.api_order_code = data.order.api_order_code
+                    }
+                    fetchData(pagination.current)
+                } else {
+                    message.error(data.message || 'Không thể kiểm tra API')
+                }
+            } catch (err) {
+                message.error('Lỗi kết nối khi gọi kiểm tra API')
+            } finally {
+                hide()
+                checkingApiId.value = null
+            }
+        }
 
         function fmt(n) {
             return new Intl.NumberFormat('vi-VN').format(n || 0) + '₫'
@@ -421,7 +480,11 @@ export default defineComponent({
             openEditPriceModal,
             getEditPriceNewTotal,
             getEditPriceDiff,
-            submitEditPrice
+            submitEditPrice,
+            checkingApiId,
+            getApiStatusColor,
+            formatApiResponse,
+            checkApiStatus
         }
     }
 })
@@ -573,7 +636,16 @@ export default defineComponent({
                         <span v-else style="color: #10b981; font-weight: 600;">{{ fmt(record.total_amount) }}</span>
                     </template>
                     <template v-if="column.key === 'status'">
-                        <a-tag :color="record.status === 'completed' ? 'success' : 'default'">{{ record.status }}</a-tag>
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                            <a-tag :color="record.status === 'completed' ? 'success' : 'default'">{{ record.status }}</a-tag>
+                            <a-tag 
+                                v-if="record.api_provider_id || record.api_order_code || record.api_status" 
+                                :color="getApiStatusColor(record.api_status)"
+                                style="font-size: 11px; margin: 0; padding: 0 6px;"
+                            >
+                                <i class="ti ti-plug me-1"></i>{{ record.api_status ? record.api_status.toUpperCase() : 'API' }}
+                            </a-tag>
+                        </div>
                     </template>
                     <template v-if="column.key === 'type'">
                         <a-tag v-if="record.type === 'warranty'" color="error">Bảo hành / Lỗi</a-tag>
@@ -584,7 +656,19 @@ export default defineComponent({
                         {{ formatDate(record.created_at) }}
                     </template>
                     <template v-if="column.key === 'action'">
-                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                        <div style="display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                            <a-button 
+                                v-if="record.api_order_code || record.api_provider_id"
+                                type="dashed" 
+                                size="small" 
+                                :loading="checkingApiId === record.id"
+                                @click.stop="checkApiStatus(record)"
+                                title="Kiểm tra trực tiếp kết quả API"
+                                style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.4);"
+                            >
+                                <i class="ti ti-refresh"></i> Check API
+                            </a-button>
+
                             <a-button type="primary" ghost size="small" @click.stop="openEditPriceModal(record)" title="Chỉnh sửa giá đơn hàng">
                                 <i class="ti ti-edit"></i> Sửa giá
                             </a-button>
@@ -613,6 +697,47 @@ export default defineComponent({
 
                 <template #expandedRowRender="{ record }">
                     <div style="padding: 16px; background-color: rgba(255, 255, 255, 0.03); border-radius: 8px;">
+                        <!-- Thông tin kết nối API nếu có -->
+                        <div v-if="record.api_provider_name || record.api_order_code || record.api_status" style="margin-bottom: 20px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 14px 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 14px; font-weight: 700; color: #93c5fd;">
+                                        <i class="ti ti-cpu me-1"></i> Đấu nối API: {{ record.api_provider_name || 'Nhà cung cấp' }}
+                                    </span>
+                                    <a-tag :color="getApiStatusColor(record.api_status)" style="font-size: 12px; font-weight: 600; padding: 2px 8px;">
+                                        {{ (record.api_status || 'CHƯA RÕ').toUpperCase() }}
+                                    </a-tag>
+                                </div>
+                                <a-button 
+                                    type="primary" 
+                                    size="small" 
+                                    ghost
+                                    :loading="checkingApiId === record.id"
+                                    @click.stop="checkApiStatus(record)"
+                                >
+                                    <i class="ti ti-refresh me-1"></i> Kiểm tra trực tiếp API
+                                </a-button>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 13px;">
+                                <div>
+                                    <span style="color: #94a3b8;">Mã đơn / Job ID: </span>
+                                    <span style="font-family: monospace; color: #facc15; font-weight: 600;">{{ record.api_order_code || '(Chưa có)' }}</span>
+                                </div>
+                                <div>
+                                    <span style="color: #94a3b8;">Trạng thái tiến trình: </span>
+                                    <span style="font-weight: 600;" :style="{ color: record.api_status === 'completed' ? '#34d399' : (record.api_status === 'failed' ? '#f87171' : '#60a5fa') }">
+                                        {{ record.api_status || 'Chưa cập nhật' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div v-if="record.api_response" style="margin-top: 12px;">
+                                <div style="color: #94a3b8; font-size: 12px; margin-bottom: 4px;">Phản hồi gần nhất từ API:</div>
+                                <pre style="margin: 0; padding: 10px 12px; background: rgba(0, 0, 0, 0.4); border-radius: 6px; font-size: 12px; color: #cbd5e1; max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">{{ formatApiResponse(record.api_response) }}</pre>
+                            </div>
+                        </div>
+
                         <h4 style="color:#93c5fd; margin-bottom: 16px;"><i class="ti ti-box"></i> Sản phẩm trong đơn</h4>
                         <a-table 
                             :dataSource="record.details" 
@@ -653,10 +778,14 @@ export default defineComponent({
                         >
                             <template #bodyCell="{ column, record: itemRecord }">
                                 <template v-if="column.key === 'username'">
-                                    <div style="font-family: monospace; word-break: break-all;">{{ itemRecord.username || '-' }}</div>
+                                    <div v-if="itemRecord.content" style="white-space: pre-wrap; font-family: monospace; font-size: 12px; line-height: 1.6; color: #e2e8f0; background: rgba(0, 0, 0, 0.25); padding: 8px 12px; border-radius: 6px; border-left: 3px solid #3b82f6;">{{ itemRecord.content }}</div>
+                                    <div v-else style="font-family: monospace; word-break: break-all;">{{ itemRecord.username || '-' }}</div>
                                 </template>
                                 <template v-if="column.key === 'password'">
-                                    <div style="font-family: monospace; word-break: break-all;">{{ itemRecord.password || '-' }}</div>
+                                    <div v-if="itemRecord.content && !itemRecord.password" style="color: #64748b; font-size: 12px; font-style: italic;">
+                                        (Trong nội dung)
+                                    </div>
+                                    <div v-else style="font-family: monospace; word-break: break-all;">{{ itemRecord.password || '-' }}</div>
                                 </template>
                                 <template v-if="column.key === 'note_status'">
                                     <div>{{ itemRecord.note || '-' }}</div>

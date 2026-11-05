@@ -88,6 +88,11 @@ AdminHelper::registerRoutes(function () {
             'uses'       => 'OrderController@handleWarranty',
             'permission' => 'telehub.orders.edit',
         ]);
+        Route::post('orders/{id}/check-api', [
+            'as'         => 'orders.check_api',
+            'uses'       => 'OrderController@checkApiStatus',
+            'permission' => 'telehub.orders.index',
+        ]);
         
         Route::group(['prefix' => 'dealers', 'as' => 'dealers.'], function () {
             Route::get('api', [

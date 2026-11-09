@@ -91,6 +91,8 @@ class ApiProviderController extends BaseController
                 $respData = is_string($ord->api_response) ? json_decode($ord->api_response, true) : $ord->api_response;
                 if (!empty($respData['data']['total_price'])) {
                     $cost = (float) $respData['data']['total_price'];
+                } elseif (!empty($respData['order']['total_price'])) {
+                    $cost = (float) $respData['order']['total_price'];
                 } elseif (!empty($respData['total_price'])) {
                     $cost = (float) $respData['total_price'];
                 }
@@ -539,10 +541,12 @@ class ApiProviderController extends BaseController
                 $cost = (float) $cat['price'];
                 $stock = (int) $cat['stock_count'];
                 $available = (bool) $cat['available'];
+                $oldStock = (int) ($prod->api_stock ?? 0);
+                $deliveryMode = $cat['delivery_mode'] ?? 'instant_items';
 
                 $prod->api_cost_price = $cost;
                 $prod->api_stock = $stock;
-                $prod->api_delivery_mode = $cat['delivery_mode'] ?? 'instant_items';
+                $prod->api_delivery_mode = $deliveryMode;
 
                 // Recalculate sale price if markup is set
                 if ($prod->api_markup_percent && $prod->api_markup_percent > 0) {
@@ -555,6 +559,38 @@ class ApiProviderController extends BaseController
 
                 $prod->save();
                 $updatedCount++;
+
+                // Nếu sản phẩm đang bật bán (published) và số lượng kho mới > kho hiện tại -> Broadcast thông báo có hàng mới như Import Tele
+                if ((string) $prod->status === 'published' && $stock > $oldStock && $deliveryMode !== 'account_upgrade') {
+                    $addedQty = $stock - $oldStock;
+                    $message = "[5458603043203327669][5458603043203327669]<b>Thống báo có hàng mới</b>[5458603043203327669][5458603043203327669]\n";
+                    $message .= ($prod->icon ? $prod->icon . ' ' : '') . "<b>{$prod->name}</b>\n";
+
+                    $warrantyUnit = $prod->warranty_unit ?? 'day';
+                    $warrantyText = empty($prod->duration_days)
+                        ? 'Không bảo hành'
+                        : ($warrantyUnit === 'hour'
+                            ? $prod->duration_days . 'H'
+                            : ($prod->duration_days == 1 ? '24h' : $prod->duration_days . ' ngày'));
+                    $message .= "🛡 <b>Bảo hành: {$warrantyText}</b>\n";
+                    $message .= "[5397916757333654639] <b>Vừa thêm: {$addedQty}</b>\n";
+                    $message .= "[5278467510604160626] <b>Kho hiện tại: {$stock}</b>\n";
+
+                    $replyMarkup = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '🛒 Mua ngay', 'callback_data' => "buy_{$prod->id}"]
+                            ]
+                        ]
+                    ];
+
+                    \Dev\Telehub\Jobs\BroadcastTelegramNotificationJob::dispatch(
+                        $message,
+                        $prod->tenant_id,
+                        null,
+                        $replyMarkup
+                    );
+                }
             }
         }
 
@@ -610,6 +646,8 @@ class ApiProviderController extends BaseController
                 $respData = is_string($ord->api_response) ? json_decode($ord->api_response, true) : $ord->api_response;
                 if (!empty($respData['data']['total_price'])) {
                     $cost = (float) $respData['data']['total_price'];
+                } elseif (!empty($respData['order']['total_price'])) {
+                    $cost = (float) $respData['order']['total_price'];
                 } elseif (!empty($respData['total_price'])) {
                     $cost = (float) $respData['total_price'];
                 }
@@ -638,6 +676,8 @@ class ApiProviderController extends BaseController
                 $respData = is_string($ord['api_response']) ? json_decode($ord['api_response'], true) : $ord['api_response'];
                 if (!empty($respData['data']['total_price'])) {
                     $cost = (float) $respData['data']['total_price'];
+                } elseif (!empty($respData['order']['total_price'])) {
+                    $cost = (float) $respData['order']['total_price'];
                 } elseif (!empty($respData['total_price'])) {
                     $cost = (float) $respData['total_price'];
                 }

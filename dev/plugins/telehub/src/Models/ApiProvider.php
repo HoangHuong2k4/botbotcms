@@ -108,6 +108,16 @@ class ApiProvider extends BaseModel
                     $this->balance = (float) $payload['credit'];
                 } elseif (isset($payload['balanceVnd'])) {
                     $this->balance = (float) $payload['balanceVnd'];
+                } elseif (isset($payload['balance_vnd']) || isset($payload['balance_usdt'])) {
+                    $balVnd = (float) ($payload['balance_vnd'] ?? 0);
+                    $balUsdt = (float) ($payload['balance_usdt'] ?? 0);
+                    if ($balVnd <= 0 && $balUsdt > 0) {
+                        $this->balance = $balUsdt;
+                        $payload['currency'] = 'USDT';
+                    } else {
+                        $this->balance = $balVnd;
+                        $payload['currency'] = 'VND';
+                    }
                 } elseif (isset($data['balance'])) {
                     $this->balance = (float) $data['balance'];
                 } elseif (isset($data['credit'])) {
@@ -263,7 +273,7 @@ class ApiProvider extends BaseModel
                     $pId = (string)($p['product_id'] ?? $p['productId'] ?? $p['product_key'] ?? $p['id'] ?? $p['name'] ?? '');
                     if (!$pId) continue;
 
-                    // Support price as number or as object { amount: 12345, currency: 'VND' }
+                    // Support price as number or as object { amount: 12345, currency: 'VND' } or price_vnd
                     $price = 0;
                     if (isset($p['price'])) {
                         if (is_array($p['price'])) {
@@ -271,6 +281,8 @@ class ApiProvider extends BaseModel
                         } else {
                             $price = (float)$p['price'];
                         }
+                    } elseif (isset($p['price_vnd'])) {
+                        $price = (float)$p['price_vnd'];
                     } else {
                         $price = (float)($p['cost_price'] ?? 0);
                     }
@@ -345,12 +357,17 @@ class ApiProvider extends BaseModel
     {
         $endpoint = '/' . ltrim($this->endpoint_orders ?: '/api/v2/orders', '/');
 
+        $parsedProductId = is_numeric($apiProductId) && str_contains($this->base_url, 'tunvnmmo')
+            ? (int) $apiProductId
+            : $apiProductId;
+
         $body = [
-            'product_id' => $apiProductId,
+            'product_id' => $parsedProductId,
             'product_name' => $apiProductId, // Supports MinhAIS which requires product_name
             'product_key' => $apiProductId, // Supports Lay2FA CTV API which requires product_key
             'quantity' => $quantity,
             'qty' => $quantity, // Supports Lay2FA CTV API which requires qty
+            'currency' => strtolower($this->currency ?: 'vnd') === 'usdt' ? 'usdt' : 'vnd', // Supports TunVN API
             'partner_ref' => $partnerRef,
             'request_id' => $partnerRef,
             'order_code' => $partnerRef, // Supports Lay2FA CTV API order_code
@@ -408,9 +425,9 @@ class ApiProvider extends BaseModel
                 }
 
                 $respData = $json['data'] ?? $json['order'] ?? $json;
-                $orderCode = $respData['job_id'] ?? $json['job_id'] ?? $respData['order_code'] ?? $respData['orderCode'] ?? $json['order']['orderCode'] ?? $respData['order_id'] ?? $respData['id'] ?? $partnerRef;
+                $orderCode = $respData['job_id'] ?? $json['job_id'] ?? $respData['order_group'] ?? ($json['order']['order_group'] ?? null) ?? $respData['order_code'] ?? $respData['orderCode'] ?? ($json['order']['orderCode'] ?? null) ?? $respData['order_id'] ?? $respData['id'] ?? $partnerRef;
 
-                // Delivery accounts from Canboso vs standard vs Lay2FA vs Safe24
+                // Delivery accounts from Canboso vs standard vs Lay2FA vs Safe24 vs TunVN
                 $items = [];
                 if (!empty($respData['job_id']) || !empty($json['job_id'])) {
                     $jobId = $respData['job_id'] ?? $json['job_id'];
@@ -421,12 +438,14 @@ class ApiProvider extends BaseModel
                     $items = $respData['delivery']['accounts'];
                 } elseif (!empty($respData['cards'])) {
                     $items = $respData['cards'];
+                } elseif (!empty($json['items']) && is_array($json['items'])) {
+                    $items = $json['items'];
                 } else {
-                    $items = $respData['items'] ?? $respData['accounts'] ?? [];
+                    $items = $respData['items'] ?? $respData['accounts'] ?? $json['accounts'] ?? [];
                 }
 
                 $status = $respData['status'] ?? $json['order']['status'] ?? 'done';
-                $balanceAfter = $json['credit'] ?? $respData['credit'] ?? $json['balance_remaining'] ?? $respData['balance_remaining'] ?? $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? $respData['new_balance'] ?? null;
+                $balanceAfter = $json['credit'] ?? $respData['credit'] ?? $json['new_balance'] ?? $respData['new_balance'] ?? $json['balance_remaining'] ?? $respData['balance_remaining'] ?? $json['payment']['balance'] ?? $respData['payment']['balance'] ?? $respData['balance'] ?? $respData['balance_after'] ?? null;
 
                 if ($balanceAfter !== null) {
                     $this->balance = (float) $balanceAfter;

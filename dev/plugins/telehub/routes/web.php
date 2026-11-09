@@ -40,6 +40,7 @@ AdminHelper::registerRoutes(function () {
             Route::get('clean-inactive', 'BotCustomerController@cleanInactive')->name('clean-inactive');
             Route::get('{bot_customer}/topup', 'BotCustomerController@getTopup')->name('topup')->middleware('can:telehub.bot-customers.topup');
             Route::post('{bot_customer}/topup', 'BotCustomerController@postTopup')->name('topup.post')->middleware('can:telehub.bot-customers.topup');
+            Route::get('{bot_customer}/toggle-ban', 'BotCustomerController@toggleBan')->name('toggle-ban')->middleware('can:telehub.bot-customers.edit');
         });
         Route::resource('balance-logs', 'BalanceLogController');
         Route::resource('deposit-requests', 'DepositRequestController');

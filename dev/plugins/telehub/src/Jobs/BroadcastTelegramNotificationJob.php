@@ -63,9 +63,12 @@ class BroadcastTelegramNotificationJob implements ShouldQueue
             return;
         }
 
-        // 4. Lấy danh sách khách hàng có trạng thái published
+        // 4. Lấy danh sách khách hàng có trạng thái published (loại trừ user đã bị chặn)
         $customersQuery = BotCustomer::query()
             ->where('status', BaseStatusEnum::PUBLISHED)
+            ->where(function ($q) {
+                $q->where('is_banned', false)->orWhereNull('is_banned');
+            })
             ->when($this->tenantId, fn($q) => $q->where('tenant_id', $this->tenantId));
 
         $totalCustomers = (clone $customersQuery)->count();

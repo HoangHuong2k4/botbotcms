@@ -159,4 +159,27 @@ class BotCustomerController extends BaseController
             ->setPreviousUrl(route('telehub.bot-customers.index'))
             ->setMessage("Đã dọn dẹp thành công {$count} người dùng không hoạt động (0 số dư, 0 đơn hàng, không vào bot > {$days} ngày)!");
     }
+
+    public function toggleBan(BotCustomer $botCustomer)
+    {
+        $botCustomer->is_banned = !$botCustomer->is_banned;
+        if ($botCustomer->is_banned) {
+            $botCustomer->status = \Dev\Base\Enums\BaseStatusEnum::DRAFT;
+        } else {
+            $botCustomer->status = \Dev\Base\Enums\BaseStatusEnum::PUBLISHED;
+        }
+        $botCustomer->save();
+
+        $uname = ($botCustomer->username && $botCustomer->username !== 'unknown')
+            ? " (@{$botCustomer->username})"
+            : '';
+
+        $msg = $botCustomer->is_banned
+            ? "🚫 Đã CHẶN người dùng {$botCustomer->full_name}{$uname} (ID: {$botCustomer->telegram_id}) khỏi Bot!"
+            : "✅ Đã BỎ CHẶN cho người dùng {$botCustomer->full_name}{$uname} (ID: {$botCustomer->telegram_id})!";
+
+        return $this->httpResponse()
+            ->setPreviousUrl(route('telehub.bot-customers.index'))
+            ->setMessage($msg);
+    }
 }

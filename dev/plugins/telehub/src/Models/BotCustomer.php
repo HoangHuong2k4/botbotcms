@@ -22,8 +22,10 @@ class BotCustomer extends BaseModel
         'tenant_id',
         'telegram_id',
         'full_name',
+        'username',
         'balance',
         'status',
+        'is_banned',
         'api_key',
         'is_dealer',
         'language',
@@ -31,6 +33,7 @@ class BotCustomer extends BaseModel
 
     protected $casts = [
         'status' => BaseStatusEnum::class,
+        'is_banned' => 'boolean',
     ];
 
     public function tenant(): BelongsTo

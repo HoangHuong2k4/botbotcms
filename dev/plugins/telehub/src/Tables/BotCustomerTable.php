@@ -42,12 +42,55 @@ class BotCustomerTable extends TableAbstract
                     ->icon('ti ti-wallet')
                     ->label(trans('plugins/telehub::telehub.bot_customers.topup'))
                     ->color('info'),
+                Action::make('toggle_ban')
+                    ->renderUsing(function (Action $action) {
+                        $item = $action->getItem();
+                        $url = route('telehub.bot-customers.toggle-ban', $item->id);
+                        if ($item->is_banned) {
+                            return sprintf(
+                                '<a href="%s" class="btn btn-sm btn-icon btn-success" data-bs-toggle="tooltip" data-bs-original-title="Bỏ chặn user này"><i class="ti ti-lock-open"></i></a>',
+                                e($url)
+                            );
+                        }
+
+                        return sprintf(
+                            '<a href="%s" class="btn btn-sm btn-icon btn-warning" data-bs-toggle="tooltip" data-bs-original-title="Chặn user khỏi Bot (Ban Scam)" onclick="return confirm(\'Bạn có chắc chắn muốn CHẶN người dùng này khỏi Bot không?\')"><i class="ti ti-ban"></i></a>',
+                            e($url)
+                        );
+                    }),
                 DeleteAction::make()->route('telehub.bot-customers.destroy'),
             ])
             ->addColumns([
                 IdColumn::make(),
                 NameColumn::make('telegram_id')->route('telehub.bot-customers.edit')->title('Telegram ID'),
-                NameColumn::make('full_name')->title('Full Name'),
+                FormattedColumn::make('username')
+                    ->title('Username (@name)')
+                    ->alignLeft()
+                    ->getValueUsing(function (FormattedColumn $column) {
+                        $u = trim((string) ($column->getItem()->username ?? ''));
+                        $u = ltrim($u, '@');
+                        if ($u === '' || strtolower($u) === 'unknown') {
+                            return '<span class="text-muted">—</span>';
+                        }
+
+                        return sprintf(
+                            '<a href="https://t.me/%s" target="_blank" rel="noopener noreferrer" class="text-info fw-semibold">@%s</a>',
+                            e($u),
+                            e($u)
+                        );
+                    }),
+                FormattedColumn::make('full_name')
+                    ->title('Full Name')
+                    ->alignLeft()
+                    ->getValueUsing(function (FormattedColumn $column) {
+                        $item = $column->getItem();
+                        $name = e($item->full_name ?: '—');
+                        if ($item->is_banned) {
+                            $name .= ' <span class="badge bg-danger text-white ms-1">🚫 Đã chặn</span>';
+                        }
+
+                        return $name;
+                    }),
             ]);
 
         if (\Illuminate\Support\Facades\Auth::user()?->isSuperUser()) {
@@ -76,8 +119,9 @@ class BotCustomerTable extends TableAbstract
             ])
             ->addFilters([
                 IdColumn::make(),
-                NameColumn::make('telegram_id'),
-                NameColumn::make('full_name'),
+                NameColumn::make('telegram_id')->title('Telegram ID'),
+                NameColumn::make('username')->title('Username (@name)'),
+                NameColumn::make('full_name')->title('Full Name'),
                 StatusColumn::make(),
                 CreatedAtColumn::make(),
             ])
@@ -86,14 +130,25 @@ class BotCustomerTable extends TableAbstract
                     'id',
                     'tenant_id',
                     'telegram_id',
+                    'username',
                     'full_name',
                     'balance',
+                    'is_banned',
                     'created_at',
                     'status',
                 ])->with(['tenant']);
             })
             ->onAjax(function (self $table) {
-                return $table->toJson($table->table->eloquent($table->query()));
+                return $table->toJson(
+                    $table->table
+                        ->eloquent($table->query())
+                        ->filterColumn('username', function ($query, $keyword) {
+                            $clean = ltrim(trim((string) $keyword), '@');
+                            if ($clean !== '') {
+                                $query->where('username', 'like', "%{$clean}%");
+                            }
+                        })
+                );
             });
     }
 }

@@ -16,6 +16,7 @@ class BotCustomerRequest extends Request
             'full_name' => 'nullable|string|max:200',
             'balance' => 'numeric|min:0',
             'status' => Rule::in(BaseStatusEnum::values()),
+            'is_banned' => 'nullable|boolean',
         ];
 
         if (\Illuminate\Support\Facades\Auth::user()?->isSuperUser()) {

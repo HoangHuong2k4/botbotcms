@@ -4,6 +4,7 @@ namespace Dev\Telehub\Forms;
 
 use Dev\Base\Forms\FieldOptions\StatusFieldOption;
 use Dev\Base\Forms\Fields\NumberField;
+use Dev\Base\Forms\Fields\OnOffField;
 use Dev\Base\Forms\Fields\SelectField;
 use Dev\Base\Forms\Fields\TextField;
 use Dev\Base\Forms\FormAbstract;
@@ -30,7 +31,7 @@ class BotCustomerForm extends FormAbstract
                 'required' => true,
             ])
             ->add('username', TextField::class, [
-                'label' => 'Username',
+                'label' => 'Username (@name)',
             ])
             ->add('full_name', TextField::class, [
                 'label' => 'Full Name',
@@ -44,6 +45,13 @@ class BotCustomerForm extends FormAbstract
                 ],
             ])
             ->add('status', SelectField::class, StatusFieldOption::make())
+            ->add('is_banned', OnOffField::class, [
+                'label' => '🚫 Chặn khỏi Bot (Ban Scam / Gian lận)',
+                'default_value' => false,
+                'help_block' => [
+                    'text' => 'Khi bật, user này sẽ bị chặn hoàn toàn mọi thao tác trên Bot Telegram và không thể mua hàng/nạp tiền.',
+                ],
+            ])
             ->setBreakFieldPoint('status');
     }
 }
